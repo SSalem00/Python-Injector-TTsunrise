@@ -62,7 +62,7 @@ Copy `game\toonbot\` and `game\TaskBot\` into your Toontown install directory as
 | **Scripts sidebar** | Browses `toonbot\Injectables\` — double-click any `.py` / `.txt` to load it |
 | **Editor** | Write Python 2.4 code to execute inside the running game |
 | **Console** | Live output — green `[done]` on success, red `[error]` + full traceback on failure |
-
+![Screenshot of injector UI](https://raw.githubusercontent.com/SSalem00/assets/main/wCzkbBxsuc.png)
 ---
 
 ## Included Scripts
