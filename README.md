@@ -75,7 +75,7 @@ The install includes [ToonBot](https://github.com/freshollie/ToonBot) and its Ta
 
 ### `toonbot\Injectables\` — Dashboard scripts
 
-These appear in the dashboard sidebar. A few example scripts are included — you can add your own `.txt` files here to quickly load and run any injector code copy and pasting it each time. For more scripts, browse the [Scrap repo](https://github.com/ttcloopy/Scrap).
+These appear in the dashboard sidebar. A few example scripts are included — you can add your own `.txt` files here to quickly load and run any injector code instead of needing to copy and paste a code everytime. For more scripts, browse the [Scrap repo](https://github.com/ttcloopy/Scrap).
 
 | Script | What it does |
 |--------|-------------|
