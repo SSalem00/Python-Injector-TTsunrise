@@ -8,6 +8,8 @@ Python injector for Toontown Sunrise Games.
 
 Uses the same DLL hook as the original **TeamFD injector** — patching `PyEval_EvalCode` in `python24.dll` to intercept the game's Python interpreter. The original Win32 GUI has been replaced with a new PyQt5 dashboard with a working debug console.
 
+If you prefer the original Win32 GUI, a decompiled and updated version of the old TeamFD DLL is included in `Source/decompiled TeamFD Injector/` — screenshots of both the original and updated versions are in there too.
+
 `ModdedLauncher.exe` is the injector — it launches Toontown, waits for the game to load, and automatically injects and opens the dashboard. No extra steps needed.
 
 ---
