@@ -1,0 +1,1 @@
+base.localAvatar.setCheesyEffect(14,0,0)

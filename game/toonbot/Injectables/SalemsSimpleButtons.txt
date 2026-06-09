@@ -1,0 +1,109 @@
+base.localAvatar.showHpString('\x01candidate_inactive\x01Salems Simple Buttons Added', duration=5, scale=0.5)
+from direct.gui.DirectGui import DirectButton
+base.localAvatar.setNametagStyle(6)
+base.localAvatar.findAllMatches('**/torso-top').setColorScale(25)
+base.localAvatar.findAllMatches('**/torso-bot').setColorScale(25)
+base.localAvatar.findAllMatches('**/sleeves').setColorScale(25)
+shirt = base.localAvatar.findAllMatches('**/torso-top')
+shirttex = loader.loadTexture("phase_4/maps/tt_t_chr_avt_shirt_halloween5.jpg")
+shirt.setTexture(shirttex, 1)
+short = base.localAvatar.findAllMatches('**/torso-bot')
+shorttex = loader.loadTexture("phase_4/maps/tt_t_chr_avt_shorts_halloween5.jpg")
+short.setTexture(shorttex, 1)
+sleeves = base.localAvatar.findAllMatches('**/sleeves')
+sleevestex = loader.loadTexture("phase_4/maps/tt_t_chr_avt_shirtSleeve_halloween5.jpg")
+sleeves.setTexture(sleevestex, 1)
+
+#night gloves
+gloves = loader.loadTexture("phase_5.5/maps/windowView_Stars2.jpg")
+base.localAvatar.findAllMatches('**/hands').setColor(1.0,0.0,0.0)
+
+
+def GLOBAL():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Global Teleport', duration=3, scale=0.5)
+   import toontown
+   base.localAvatar.setTeleportAccess(toontown.toonbase.ToontownGlobals.HoodsForTeleportAll)
+   base.localAvatar.setHoodsVisited(toontown.toonbase.ToontownGlobals.HoodsForTeleportAll)
+   base.localAvatar.book.pages[1].shardChoiceReject = base.localAvatar.book.pages[1].choseShard
+   base.localAvatar.book.pages[1].showPop = 1
+   base.localAvatar.setSystemMessage(0, 'Global Teleport Activated')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn8 = DirectButton(frameSize=None, text='Global TP', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=GLOBAL, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.46), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+
+def FASTON():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Fast On', duration=2, scale=0.5)
+   base.localAvatar.physControls.avatarControlReverseSpeed=60
+   base.localAvatar.physControls.avatarControlRotateSpeed=170
+   base.localAvatar.physControls.avatarControlJumpForce = 50
+   base.localAvatar.physControls.setGravity(35)
+   base.localAvatar.physControls.avatarControlForwardSpeed = 80
+   base.localAvatar.setSystemMessage(1, 'Fast On')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn21 = DirectButton(frameSize=None, text='Fast On', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=FASTON, text_pos=(0, -0.015),
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.85,-0,-.85), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+
+def FASTOFF():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Fast Off', duration=2, scale=0.5)
+   base.localAvatar.physControls.avatarControlReverseSpeed=10
+   base.localAvatar.physControls.avatarControlRotateSpeed=80
+   base.localAvatar.physControls.avatarControlJumpForce = 25
+   base.localAvatar.physControls.setGravity(50)
+   base.localAvatar.physControls.avatarControlForwardSpeed = 20
+   base.localAvatar.setSystemMessage(1, 'Fast Off')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn22 = DirectButton(frameSize=None, text='Fast Off', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=FASTOFF, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.85,-0,-.93), text_scale=0.059999999999999998, borderWidth=(0.015, 0.01), scale=.7)
+
+def DANCE():
+   base.localAvatar.b_setAnimState("victory", 10)
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Dancing', duration=2, scale=0.5)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn23 = DirectButton(frameSize=None, text='Fast Dance', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=DANCE, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (.77,-0,-.93), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+
+def blackToon():
+  base.localAvatar.find('**/ears-short').setColor(0.25,0.25,0.3)
+  base.localAvatar.find('**/head-short').setColor(0.25,0.25,0.3)
+  base.localAvatar.find('**/head-front-short').setColor(0.25,0.25,0.3)
+  base.localAvatar.find('**/neck').removeNode()
+  base.localAvatar.find('**/neck').setColor(0.25,0.25,0.3)
+  base.localAvatar.find('**/arms').removeNode()
+  base.localAvatar.find('**/arms').removeNode()
+  base.localAvatar.find('**/arms').setColor(0.25,0.25,0.3)
+  base.localAvatar.find('**/legs').removeNode()
+  base.localAvatar.find('**/legs').removeNode()
+  base.localAvatar.find('**/legs').setColor(0.25,0.25,0.3)
+  base.localAvatar.find('**/feet').removeNode()
+  base.localAvatar.find('**/feet').removeNode()
+  base.localAvatar.find('**/feet').setColor(0.25,0.25,0.3)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn32 = DirectButton(frameSize=None, text='Black Toon', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=blackToon, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.6), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+
+
+
+
+def UNLOAD():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Buttons Unloaded', duration=2, scale=0.5)
+   for b in (ImgBtn8, ImgBtn21, ImgBtn22, ImgBtn23, ImgBtn32, ImgBtnUnload):
+      try:
+         b.destroy()
+      except:
+         pass
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnUnload = DirectButton(frameSize=None, text='Unload', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=UNLOAD, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.74), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+
+
+
+
+
+
+
