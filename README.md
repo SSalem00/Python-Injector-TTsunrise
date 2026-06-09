@@ -24,7 +24,7 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
 
 ### Installation
 
-1. Download `ModdedLauncher.7z` from the [Releases](../../releases/latest) page
+1. Download `Injector.7z` from the [Releases](../../releases/latest) page
 2. Extract the archive — it contains `ModdedLauncher.exe`, `toonbot\`, and `TaskBot\`
 3. Copy `toonbot\` and `TaskBot\` into your Toontown install directory (**both folders are required**):
    ```
@@ -37,6 +37,7 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
    └── TaskBot\
    ```
 4. Place `ModdedLauncher.exe` anywhere and run as Administrator
+
 
 ### Building from source
 
