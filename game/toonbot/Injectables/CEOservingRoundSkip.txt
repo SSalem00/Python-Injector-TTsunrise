@@ -1,0 +1,49 @@
+from direct.interval.IntervalGlobal import Sequence, Wait, Func
+from toontown.suit import DistributedBossbotBoss
+
+oldEnterBattleTwo = DistributedBossbotBoss.DistributedBossbotBoss.enterBattleTwo
+
+class ServingSkip:
+    def __init__(self):
+        self.tries = 0
+        # Hook future serving rounds (works if injected BEFORE the round starts).
+        DistributedBossbotBoss.DistributedBossbotBoss.enterBattleTwo = \
+            lambda newSelf: self.newEnterBattleTwo(newSelf)
+        # Also handle the case where we're injected while ALREADY in the round.
+        self.skipNow()
+
+    def findBoss(self):
+        for do in base.cr.doId2do.values():
+            if isinstance(do, DistributedBossbotBoss.DistributedBossbotBoss):
+                return do
+        return None
+
+    def skipNow(self):
+        boss = self.findBoss()
+        if boss is not None:
+            base.localAvatar.setSystemMessage(0, 'ServingSkip: boss found, clearing BattleTwo barrier')
+            self.tries = 0
+            self.skip(boss)
+        else:
+            base.localAvatar.setSystemMessage(0, 'ServingSkip: armed (no boss present yet)')
+
+    def newEnterBattleTwo(self, newSelf):
+        oldEnterBattleTwo(newSelf)
+        base.localAvatar.setSystemMessage(0, 'ServingSkip: skipping serving round')
+        self.tries = 0
+        self.skip(newSelf)
+
+    def skip(self, newSelf):
+        try:
+            newSelf.doneBarrier('BattleTwo')
+        except:
+            pass
+        # Retry briefly; doneBarrier no-ops harmlessly when not in the BattleTwo barrier.
+        self.tries += 1
+        if self.tries < 10:
+            Sequence(Wait(0.5), Func(self.skip, newSelf)).start()
+
+    def revert(self):
+        DistributedBossbotBoss.DistributedBossbotBoss.enterBattleTwo = oldEnterBattleTwo
+
+servingSkip = ServingSkip()

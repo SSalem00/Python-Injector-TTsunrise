@@ -10,7 +10,7 @@ Uses the same DLL hook as the original **TeamFD injector** — patching `PyEval_
 
 If you prefer the original Win32 GUI, a decompiled and updated version of the old TeamFD DLL is included in `Source/decompiled TeamFD Injector/` — screenshots of both the original and updated versions are in there too.
 
-`ModdedLauncher.exe` is the injector — it launches Toontown, waits for the game to load, and automatically injects and opens the dashboard. No extra steps needed.
+`TTsunriseInjector.exe` is the injector with a new UI — it launches Toontown launcher, waits for the game to load, and automatically hooks to the game PID. It also automatically reinjects to a new game process if the game crashes or closes.
 
 ---
 
@@ -24,8 +24,8 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
 
 ### Installation
 
-1. Download `Injector.7z` from the [Releases](../../releases/latest) page
-2. Extract the archive — it contains `ModdedLauncher.exe`, `toonbot\`, and `TaskBot\`
+1. Download `TTsunriseInjector.7z` from the [Releases](../../releases/latest) page
+2. Extract the archive — it contains `TTsunriseInjector.exe`, `toonbot\`, and `TaskBot\`
 3. Copy `toonbot\` and `TaskBot\` into your Toontown install directory (**both folders are required**):
    ```
    ToontownOnline\
@@ -36,7 +36,7 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
    │   └── Injectables\
    └── TaskBot\
    ```
-4. Place `ModdedLauncher.exe` anywhere and run as Administrator
+4. Place `TTsunriseInjector.exe` anywhere and run as Administrator
 
 
 ### Building from source
@@ -52,12 +52,13 @@ Copy `game\toonbot\` and `game\TaskBot\` into your Toontown install directory as
 
 ## Usage
 
-1. **Run `ModdedLauncher.exe` as Administrator**
+1. **Run `TTsunriseInjector.exe` as Administrator**
 2. Log in through the Toontown launcher normally
 3. The injector waits ~15 seconds for the game to load, then injects and opens the dashboard
 4. Console will show `[+] bridge live on :8888` when ready
 5. Write or load a script in the editor and press **Ctrl+Enter** to run it in-game
 
+6. Also work if you already have the game opened.
 ### Dashboard
 
 | Panel | Description |
@@ -68,7 +69,7 @@ Copy `game\toonbot\` and `game\TaskBot\` into your Toontown install directory as
 ---
 ![Screenshot of injector UI](https://raw.githubusercontent.com/SSalem00/assets/main/wCzkbBxsuc.png)
 
-
+![Screenshot of injector UI](https://raw.githubusercontent.com/SSalem00/assets/main/znPmTwvKPH.png)
 ## Included Scripts
 
 The install includes [ToonBot](https://github.com/freshollie/ToonBot) and its TaskBot — a collection of automation scripts for boss battles, gag training, ToonTasks, and more. The `toonbot\scripts\` folder is left in as a reference and base to build from.
