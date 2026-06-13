@@ -32,6 +32,24 @@ faceOffHook = lambda self, ts, name, callback:self.d_faceOffDone(self)
 DistributedStageBattle.DistributedStageBattle._DistributedLevelBattle__faceOff = faceOffHook
 DistributedBattle.DistributedBattle._DistributedBattle__faceOff = faceOffHook
 
+#Fix for hard crash: "AttributeError: TownBattle instance has no attribute 'creditMultiplier'"
+#The faceOff hook above skips part of the battle setup, so the TownBattle's creditMultiplier
+#may not be set before enterWaitForInput reads it (the bot blitzes battles fast enough to lose
+#this race, e.g. on the DA office final battle). Default it to 1 so adjustCogsAndToons won't throw.
+def makeCreditMultiplierSafe(battleClass):
+    oldEnterWaitForInput = battleClass.enterWaitForInput
+    def newEnterWaitForInput(self, *args, **kwds):
+        try:
+            if not hasattr(self.townBattle, 'creditMultiplier'):
+                self.townBattle.creditMultiplier = 1
+        except:
+            pass
+        return oldEnterWaitForInput(self, *args, **kwds)
+    battleClass.enterWaitForInput = newEnterWaitForInput
+
+makeCreditMultiplierSafe(DistributedStageBattle.DistributedStageBattle)
+makeCreditMultiplierSafe(DistributedBattle.DistributedBattle)
+
 oldTrolleyInit = DistributedTrolley.DistributedTrolley.__init__
 oldPartyInit = DistributedPartyGate.DistributedPartyGate.__init__
 oldDoorInit = DistributedDoor.DistributedDoor.__init__
@@ -56,6 +74,13 @@ oldFisherAnnounceGenerate = DistributedNPCFisherman.DistributedNPCFisherman.anno
 def newFishermanAnnounceGenerate(self):
     try:
         oldFisherAnnounceGenerate(self)
+    except:
+        return None
+
+oldFishermanInitToonState = DistributedNPCFisherman.DistributedNPCFisherman.initToonState
+def newFishermanInitToonState(self):
+    try:
+        oldFishermanInitToonState(self)
     except:
         return None
  
@@ -106,6 +131,7 @@ class restock:
         DistributedDale.DistributedDale.setFollowChip = newWalk
         
         DistributedNPCFisherman.DistributedNPCFisherman.announceGenerate = newFishermanAnnounceGenerate
+        DistributedNPCFisherman.DistributedNPCFisherman.initToonState = newFishermanInitToonState
         DistributedNPCPartyPerson.DistributedNPCPartyPerson.announceGenerate = newPartyPlannerAnnounceGenerate
         
         self.lookAroundHookSeq = Sequence(Func(self.lookAroundHookFunc), Wait(2.5))
@@ -198,10 +224,6 @@ class restock:
         for x in base.cr.doFindAll('Treasure'):
             x.setPosition(0, 0, 8**8)
  
-        for x in base.cr.doFindAll('render/DistributedFishingTarget'):
-            x.bubbles.removeNode()
-            x.removeNode()
-                
     def gainLaff(self):
         if base.localAvatar.getHp()!=base.localAvatar.getMaxHp():
             if self.unloaded:
@@ -580,6 +602,7 @@ class CjAutoer:
     oldBossEnterElevator=DistributedLawbotBoss.DistributedLawbotBoss.enterElevator
     oldEnterBattleThree=DistributedLawbotBoss.DistributedLawbotBoss.enterBattleThree
     oldEnterPrepareBattleTwo=DistributedLawbotBoss.DistributedLawbotBoss.enterPrepareBattleTwo
+    oldEnterBattleTwo=DistributedLawbotBoss.DistributedLawbotBoss.enterBattleTwo
     oldEnterPrepareBattleThree=DistributedLawbotBoss.DistributedLawbotBoss.enterPrepareBattleThree
     oldEnterEpilogue=DistributedLawbotBoss.DistributedLawbotBoss.enterEpilogue
     oldEnterRollToBattleTwo=DistributedLawbotBoss.DistributedLawbotBoss.enterRollToBattleTwo
@@ -596,6 +619,7 @@ class CjAutoer:
         DistributedCogHQDoor.DistributedCogHQDoor.avatarExit=lambda newSelf,id: self.newAvatarExit(newSelf,id)
         DistributedLawbotBoss.DistributedLawbotBoss.enterPrepareBattleThree=lambda newSelf: self.newEnterPrepareBattleThree(newSelf)
         DistributedLawbotBoss.DistributedLawbotBoss.enterPrepareBattleTwo=lambda newSelf: self.newEnterPrepareBattleTwo(newSelf)
+        DistributedLawbotBoss.DistributedLawbotBoss.enterBattleTwo=lambda newSelf: self.newEnterBattleTwo(newSelf)
         DistributedLawbotBoss.DistributedLawbotBoss.enterEpilogue=lambda newSelf: self.newEnterEpilogue(newSelf)
         
     def newBossEnterElevator(self,newSelf):
@@ -630,8 +654,32 @@ class CjAutoer:
         if cjMaxer.otherFunctions.shouldContinue:
             newSelf._DistributedLawbotBoss__onToBattleTwo(33)
             cjMaxer.autoerGui.display.newLine('Skipping dialogue 1')
-            cjMaxer.autoerGui.display.newLine('Waiting for cannon round...')
-    
+
+    def newEnterBattleTwo(self,newSelf):
+        #The cannon (jury) round ends the moment every involved toon clears the
+        #server's 'BattleTwo' barrier. Soloing, we just clear it ourselves to skip
+        #the whole round - same trick the elevator/intro skips already use. Jurors
+        #don't matter: endBattle() sends hitBoss(100), which is above the jury-weight
+        #threshold, so 0 seated jurors still one-shots the CJ.
+        self.oldEnterBattleTwo(newSelf)
+        if cjMaxer.otherFunctions.shouldContinue:
+            cjMaxer.autoerGui.display.newLine('Skipping cannon round')
+            self.cannonSkipTries=0
+            self.skipCannonRound(newSelf)
+
+    def skipCannonRound(self,newSelf):
+        if not cjMaxer.otherFunctions.shouldContinue:
+            return
+        try:
+            newSelf.doneBarrier('BattleTwo')
+        except:
+            pass
+        #Retry briefly in case the barrier data hasn't arrived yet; once the round
+        #advances, doneBarrier finds no matching context and harmlessly no-ops.
+        self.cannonSkipTries+=1
+        if self.cannonSkipTries<5:
+            Sequence(Wait(0.5),Func(self.skipCannonRound,newSelf)).start()
+
     def newEnterPrepareBattleThree(self,newSelf):
         self.oldEnterPrepareBattleThree(newSelf)
         if cjMaxer.otherFunctions.shouldContinue:
@@ -687,6 +735,7 @@ class CjAutoer:
         DistributedLawbotBoss.DistributedLawbotBoss.enterElevator=self.oldBossEnterElevator
         DistributedLawbotBoss.DistributedLawbotBoss.enterBattleThree=self.oldEnterBattleThree
         DistributedLawbotBoss.DistributedLawbotBoss.enterPrepareBattleTwo=self.oldEnterPrepareBattleTwo
+        DistributedLawbotBoss.DistributedLawbotBoss.enterBattleTwo=self.oldEnterBattleTwo
         DistributedLawbotBoss.DistributedLawbotBoss.enterPrepareBattleThree=self.oldEnterPrepareBattleThree
         DistributedLawbotBoss.DistributedLawbotBoss.enterEpilogue=self.oldEnterEpilogue
         DistributedLawbotBoss.DistributedLawbotBoss.enterRollToBattleTwo=self.oldEnterRollToBattleTwo
@@ -758,22 +807,22 @@ class DAautoer:
         cjMaxer.autoerGui.display.newLine('Died, recovering')
         
     def enterBattle(self):
-        enteredBattle = False
         if base.localAvatar.getHp()>0:
-            while not enteredBattle:
-                try:
-                    base.cr.doFind('DistributedStage.DistributedStage').warpToRoom(2)
-                    cogList = base.cr.doFindAll("render")
-                    for x in cogList:
-                        if isinstance(x, DistributedStageSuit) or isinstance(x, DistributedSuit):
-                            if x.activeState == 6 and x.getActualLevel() == 12:
-                                #This is the Clerk.
-                                x.d_requestBattle(x.getPos(), x.getHpr())
-                                enteredBattle = True
-                                base.localAvatar.collisionsOn()
-                                cjMaxer.restock.wasInBattle=False
-                except:
-                    pass
+            try:
+                stage = base.cr.doFind('DistributedStage.DistributedStage')
+                if stage is None:
+                    return
+                stage.warpToRoom(2)
+                cogList = base.cr.doFindAll("render")
+                for x in cogList:
+                    if isinstance(x, DistributedStageSuit) or isinstance(x, DistributedSuit):
+                        if x.activeState == 6 and x.getActualLevel() == 12:
+                            x.d_requestBattle(x.getPos(), x.getHpr())
+                            base.localAvatar.collisionsOn()
+                            cjMaxer.restock.wasInBattle=False
+                            return
+            except:
+                pass
     
     def workOutOfficeNeeded(self):
         noticesNeeded=cjMaxer.otherFunctions.getNoticesLeft()
@@ -883,8 +932,7 @@ class JellybeanFarmer:
         self.maxer.autoerGui.display.newLine('Fishing at Dreamland')
         try:
             self._noToonsRunning=self.maxer.restock.noToons.isPlaying()
-            if self._noToonsRunning:
-                self.maxer.restock.noToons.finish()
+            self.maxer.restock.noToons.finish()
         except:
             self._noToonsRunning=False
         self.maxer.otherFunctions.walk()
@@ -996,6 +1044,7 @@ class CJMaxer:
         DistributedNPCFisherman.DistributedNPCFisherman.handleCollisionSphereEnter=oldHandleEnterCollisionSphereFisherman
         DistributedNPCPartyPerson.DistributedNPCPartyPerson.handleCollisionSphereEnter=oldHandleEnterCollisionSphereParty
         DistributedNPCFisherman.DistributedNPCFisherman.announceGenerate=oldFisherAnnounceGenerate
+        DistributedNPCFisherman.DistributedNPCFisherman.initToonState=oldFishermanInitToonState
         DistributedNPCPartyPerson.DistributedNPCPartyPerson.announceGenerate=oldPartyPlannerAnnounceGenerate
 
         DistributedMickey.DistributedMickey.setWalk = oldMickeySetWalk
