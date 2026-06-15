@@ -1,0 +1,640 @@
+from direct.interval.IntervalGlobal import *
+from toontown.fishing import FishGlobals
+from toontown.toonbase import ToontownGlobals
+from toontown.hood import ZoneUtil
+
+# FishMaxer - cross-references your Fish Album against every species in the
+# game, goes to the pond (playground OR street) that catches the most of your
+# MISSING fish, auto-boards a dock and fishes until the target is caught, then
+# moves on. Built on freshollie's catch/sell mechanic.
+#
+# STREET PONDS: the server rejects direct teleport to a street (how=teleportIn
+# bounces back to the playground). So we reach streets the legit way - teleport
+# to the street's PLAYGROUND, then trigger the street TUNNEL (how=tunnelIn) by
+# firing the playground's own bound 'enter<tunnel_trigger>' event, exactly as
+# walking into the tunnel would. The street then loads fully (no crashes) and
+# fishing works like any playground dock.
+
+class FishMaxer:
+
+    # Playgrounds first (so ties favour the simpler playground dock), then streets.
+    POND_ZONES = [ToontownGlobals.ToontownCentral,
+                  ToontownGlobals.DonaldsDock,
+                  ToontownGlobals.DaisyGardens,
+                  ToontownGlobals.MinniesMelodyland,
+                  ToontownGlobals.TheBrrrgh,
+                  ToontownGlobals.DonaldsDreamland,
+                  ToontownGlobals.SillyStreet,
+                  ToontownGlobals.LoopyLane,
+                  ToontownGlobals.PunchlinePlace,
+                  ToontownGlobals.BarnacleBoulevard,
+                  ToontownGlobals.SeaweedStreet,
+                  ToontownGlobals.LighthouseLane,
+                  ToontownGlobals.ElmStreet,
+                  ToontownGlobals.AltoAvenue,
+                  ToontownGlobals.BaritoneBoulevard,
+                  ToontownGlobals.TenorTerrace,
+                  ToontownGlobals.WalrusWay,
+                  ToontownGlobals.SleetStreet,
+                  ToontownGlobals.LullabyLane]
+
+    # The street ponds (everything in POND_ZONES that needs a tunnel to reach).
+    STREET_BRANCHES = [ToontownGlobals.SillyStreet,
+                       ToontownGlobals.LoopyLane,
+                       ToontownGlobals.PunchlinePlace,
+                       ToontownGlobals.BarnacleBoulevard,
+                       ToontownGlobals.SeaweedStreet,
+                       ToontownGlobals.LighthouseLane,
+                       ToontownGlobals.ElmStreet,
+                       ToontownGlobals.AltoAvenue,
+                       ToontownGlobals.BaritoneBoulevard,
+                       ToontownGlobals.TenorTerrace,
+                       ToontownGlobals.WalrusWay,
+                       ToontownGlobals.SleetStreet,
+                       ToontownGlobals.LullabyLane]
+
+    POND_NAMES = {ToontownGlobals.ToontownCentral: 'Toontown Central',
+                  ToontownGlobals.DonaldsDock: "Donald's Dock",
+                  ToontownGlobals.DaisyGardens: 'Daisy Gardens',
+                  ToontownGlobals.MinniesMelodyland: "Minnie's Melodyland",
+                  ToontownGlobals.TheBrrrgh: 'The Brrrgh',
+                  ToontownGlobals.DonaldsDreamland: "Donald's Dreamland",
+                  ToontownGlobals.MyEstate: 'My Estate',
+                  ToontownGlobals.SillyStreet: 'Silly Street',
+                  ToontownGlobals.LoopyLane: 'Loopy Lane',
+                  ToontownGlobals.PunchlinePlace: 'Punchline Place',
+                  ToontownGlobals.BarnacleBoulevard: 'Barnacle Boulevard',
+                  ToontownGlobals.SeaweedStreet: 'Seaweed Street',
+                  ToontownGlobals.LighthouseLane: 'Lighthouse Lane',
+                  ToontownGlobals.ElmStreet: 'Elm Street',
+                  ToontownGlobals.AltoAvenue: 'Alto Avenue',
+                  ToontownGlobals.BaritoneBoulevard: 'Baritone Boulevard',
+                  ToontownGlobals.TenorTerrace: 'Tenor Terrace',
+                  ToontownGlobals.WalrusWay: 'Walrus Way',
+                  ToontownGlobals.SleetStreet: 'Sleet Street',
+                  ToontownGlobals.LullabyLane: 'Lullaby Lane'}
+
+    # The DNA visgroup cell that holds each street's fishing pond. Once we're on
+    # the street, addInterest to this cell so the pond's dock DOs stream in (the
+    # tunnel drops us at the far end, where the pond cell isn't yet loaded).
+    STREET_POND_ZONE = {ToontownGlobals.SillyStreet: 2156,
+                        ToontownGlobals.LoopyLane: 2236,
+                        ToontownGlobals.PunchlinePlace: 2341,
+                        ToontownGlobals.BarnacleBoulevard: 1129,
+                        ToontownGlobals.SeaweedStreet: 1236,
+                        ToontownGlobals.LighthouseLane: 1330,
+                        ToontownGlobals.ElmStreet: 5139,
+                        ToontownGlobals.AltoAvenue: 4148,
+                        ToontownGlobals.BaritoneBoulevard: 4240,
+                        ToontownGlobals.TenorTerrace: 4345,
+                        ToontownGlobals.WalrusWay: 3136,
+                        ToontownGlobals.SleetStreet: 3236,
+                        ToontownGlobals.LullabyLane: 9153}
+
+    def __init__(self):
+        self.shouldContinue = False
+        self.includeEstate = False
+        self.fishNum = 0
+        self.newCount = 0
+        self.ownedSnapshot = {}
+        self.currentTarget = None     # (genus, species) we are hunting
+        self.targetPond = None        # zone id of the pond we are headed to
+        self.spot = None              # the DistributedFishingSpot we boarded
+        self.streetInterest = None    # addInterest handle for a street pond cell
+        self.sellHood = ToontownGlobals.DonaldsDock
+        self.skipUltraRare = True     # skip rarity > maxRarity (hard for low rods)
+        self.maxRarity = 9            # 10 = ultra rare; skip it by default
+        self.rodOverride = None       # None = auto-detect; else a rod id 0-4
+        self.castTries = 0            # how long we've waited to be seated
+        self.autoerGui = AutoerGui('Fish Maxer',
+                                   ['Run Time', 'Species Owned', 'Species Left', 'Target', 'New This Run'],
+                                   ['self.formattedTime',
+                                    'str(fishMaxer.ownedCount())',
+                                    'str(fishMaxer.missingCount())',
+                                    'fishMaxer.targetName()',
+                                    'str(fishMaxer.newCount)'],
+                                   'FISH MAXER', None)
+        self.installSafety()
+
+    # ------------------------------------------------------------------ data
+    def allSpecies(self):
+        out = []
+        for g in FishGlobals.getGenera():
+            for s in range(len(FishGlobals.getSpecies(g))):
+                out.append((g, s))
+        return out
+
+    def isOwned(self, fish):
+        try:
+            return base.localAvatar.fishCollection.hasFish(fish[0], fish[1])
+        except:
+            return 0
+
+    def ownedSet(self):
+        owned = {}
+        for f in self.allSpecies():
+            if self.isOwned(f):
+                owned[f] = 1
+        return owned
+
+    def fishName(self, fish):
+        try:
+            from toontown.toonbase import TTLocalizer
+            return TTLocalizer.FishSpeciesNames[fish[0]][fish[1]]
+        except:
+            return 'G%s S%s' % (fish[0], fish[1])
+
+    def reportNewFish(self):
+        current = self.ownedSet()
+        for f in current.keys():
+            if f not in self.ownedSnapshot:
+                name = self.fishName(f)
+                self.newCount += 1
+                self.autoerGui.display.newLine('NEW FISH: ' + name + '!')
+                base.localAvatar.setSystemMessage(0, 'Fish Maxer: Caught a NEW species - ' + name + '!')
+        self.ownedSnapshot = current
+
+    def missingFish(self):
+        out = []
+        for f in self.allSpecies():
+            if not self.isOwned(f):
+                out.append(f)
+        return out
+
+    # Rarity is PER-POND, not global: a fish sits at its base rarity at its best
+    # spot and gets harder (+1/+2) elsewhere (getEffectiveRarity = rarity+offset).
+    # getPondInfo()[zone][rod] = {effectiveRarity: [(genus,species),...]} already
+    # bakes in the rod's catchability AND the per-pond effective rarity, so we use
+    # it directly. e.g. Siamese Cat Fish is rarity 10 (ultra) at the playground
+    # but 9 at Elm Street, so with skipUltraRare we hunt it on Elm Street only.
+    def pondRodInfo(self, zone):
+        try:
+            return FishGlobals.getPondInfo().get(zone, {}).get(self.rodFor(), {})
+        except:
+            return {}
+
+    # Effective rarity of a fish at a pond with the current rod, or None if the
+    # current rod can't catch it there at all.
+    def effRarityAt(self, fish, zone):
+        info = self.pondRodInfo(zone)
+        for rarity, lst in info.items():
+            if fish in lst:
+                return rarity
+        return None
+
+    # Worth hunting this fish at this pond right now?
+    def huntableAt(self, fish, zone):
+        r = self.effRarityAt(fish, zone)
+        if r is None:
+            return False
+        if self.skipUltraRare and r > self.maxRarity:
+            return False
+        return True
+
+    def ownedCount(self):
+        n = 0
+        for f in self.allSpecies():
+            if self.isOwned(f):
+                n += 1
+        return n
+
+    def missingCount(self):
+        return len(self.allSpecies()) - self.ownedCount()
+
+    def activePonds(self):
+        zones = self.POND_ZONES[:]
+        if self.includeEstate:
+            zones.append(ToontownGlobals.MyEstate)
+        return zones
+
+    def pondFish(self, zone):
+        try:
+            return FishGlobals.getSimplePondInfo().get(zone, [])
+        except:
+            return []
+
+    def targetName(self):
+        if self.currentTarget is None:
+            return '-'
+        return self.fishName(self.currentTarget)
+
+    # Pick the pond that lets us catch the most missing fish (at an acceptable
+    # per-pond rarity for our rod), then target the EASIEST missing fish there.
+    def chooseTarget(self):
+        missing = self.missingFish()
+        if not missing:
+            self.currentTarget = None
+            self.targetPond = None
+            return False
+        best = None
+        bestCount = 0
+        for z in self.activePonds():
+            c = 0
+            for f in missing:
+                if self.huntableAt(f, z):
+                    c += 1
+            if c > bestCount:
+                bestCount = c
+                best = z
+        if best is None:
+            # nothing missing is catchable with this rod at an acceptable rarity
+            self.currentTarget = None
+            self.targetPond = None
+            return False
+        self.targetPond = best
+        self.currentTarget = None
+        bestR = 99
+        for f in missing:
+            r = self.effRarityAt(f, best)
+            if r is not None and (not self.skipUltraRare or r <= self.maxRarity):
+                if r < bestR:
+                    bestR = r
+                    self.currentTarget = f
+        return self.currentTarget is not None
+
+    # ------------------------------------------------------------ main loop
+    def start(self):
+        self.shouldContinue = True
+        self.fishNum = 0
+        self.newCount = 0
+        self.ownedSnapshot = self.ownedSet()
+        self.autoerGui.startTimer()
+        self.run()
+
+    def run(self):
+        if not self.shouldContinue:
+            return
+        if not self.chooseTarget():
+            self.autoerGui.display.newLine('No catchable species left with this rod')
+            base.localAvatar.setSystemMessage(0, 'Fish Maxer: Caught everything your rod can get (skipping ultra-rares). Get a better rod for the rest!')
+            self.setStop()
+            return
+        self.autoerGui.display.newLine('Target ' + self.targetName() + ' @ ' + self.POND_NAMES.get(self.targetPond, '?'))
+        self.proceed()
+
+    # Decide the next step toward the target pond and take it.
+    def proceed(self):
+        if not self.shouldContinue:
+            return
+        zone = self.targetPond
+        if self.atZone(zone):
+            self.arriveAtPond()
+            return
+        if zone in self.STREET_BRANCHES:
+            hood = self.hoodFor(zone)
+            if self.atZone(hood):
+                self.enterTunnelTo(zone)     # walk the tunnel from the playground
+            else:
+                self.travelTo(hood)          # teleport to the playground first
+        else:
+            self.travelTo(zone)              # playground pond: teleport straight in
+
+    def hoodFor(self, zone):
+        try:
+            return ZoneUtil.getHoodId(zone)
+        except:
+            return (int(zone) / 1000) * 1000
+
+    def atZone(self, zone):
+        try:
+            return ZoneUtil.getBranchZone(base.localAvatar.getZoneId()) == ZoneUtil.getBranchZone(zone)
+        except:
+            return base.localAvatar.getZoneId() == zone
+
+    # We've reached the target pond's branch. For street ponds, load the pond's
+    # cell so its dock streams in before we try to board.
+    def arriveAtPond(self):
+        if not self.shouldContinue:
+            return
+        pv = self.STREET_POND_ZONE.get(self.targetPond)
+        if pv is not None:
+            self.removeStreetInterest()
+            self.autoerGui.display.newLine('Loading the dock...')
+            try:
+                self.streetInterest = base.cr.addInterest(base.localAvatar.defaultShard, pv, description='fishmaxer', event=None)
+            except:
+                self.streetInterest = None
+            # give the street cell time to stream the dock in before boarding
+            Sequence(Wait(4), Func(self.boardAndFish)).start()
+        else:
+            self.boardAndFish()
+
+    def removeStreetInterest(self):
+        if getattr(self, 'streetInterest', None) is not None:
+            try:
+                base.cr.removeInterest(self.streetInterest)
+            except:
+                pass
+            self.streetInterest = None
+
+    def restoreCollisions(self):
+        try:
+            base.localAvatar.collisionsOn()
+        except:
+            pass
+
+    def travelTo(self, zone):
+        self.restoreCollisions()
+        self.removeStreetInterest()
+        self.autoerGui.display.newLine('Teleporting to ' + self.POND_NAMES.get(zone, '?'))
+        self.walk()
+        try:
+            base.cr.playGame.getPlace().requestTeleport(self.hoodFor(zone), zone, None, None)
+        except:
+            pass
+        Sequence(Wait(2), Func(self.afterArrive, zone, 0)).start()
+
+    # Fire the playground's own tunnel-enter event for the target street. This
+    # runs handleEnterTunnel with the game's bound requestStatus (how=tunnelIn),
+    # i.e. identical to walking into the tunnel - no crash, properly loads street.
+    def enterTunnelTo(self, street):
+        self.restoreCollisions()
+        self.autoerGui.display.newLine('Entering tunnel to ' + self.POND_NAMES.get(street, '?'))
+        self.walk()
+        name = self.findTunnelTrigger(street)
+        if name is None:
+            self.autoerGui.display.newLine('Tunnel not found yet, retrying')
+            Sequence(Wait(1), Func(self.proceed)).start()
+            return
+        try:
+            messenger.send('enter' + name, [None])
+        except:
+            pass
+        Sequence(Wait(2), Func(self.afterArrive, street, 0)).start()
+
+    # Find the collision-trigger node for the tunnel leading to 'street'.
+    def findTunnelTrigger(self, street):
+        branch = ZoneUtil.getBranchZone(street)
+        try:
+            matches = render.findAllMatches('**/tunnel_trigger_*')
+        except:
+            return None
+        for i in range(matches.getNumPaths()):
+            nm = matches.getPath(i).getName()
+            parts = nm.split('_')
+            try:
+                z = int(parts[-1])
+            except:
+                continue
+            try:
+                same = (ZoneUtil.getBranchZone(z) == branch)
+            except:
+                same = (z == street)
+            if same:
+                return nm
+        return None
+
+    def afterArrive(self, zone, tries):
+        if not self.shouldContinue:
+            return
+        if self.atZone(zone):
+            self.proceed()       # arrived - re-decide (board, or tunnel into street)
+        elif tries < 20:
+            Sequence(Wait(1), Func(self.afterArrive, zone, tries + 1)).start()
+        else:
+            self.autoerGui.display.newLine('Travel timed out, retrying')
+            self.run()
+
+    def walk(self):
+        try:
+            base.cr.playGame.getPlace().fsm.forceTransition('walk')
+        except:
+            pass
+
+    # --------------------------------------------------------- board a dock
+    def findFreeSpot(self):
+        spots = base.cr.doFindAll('FishingSpot')
+        for sp in spots:
+            av = getattr(sp, 'avId', 0)
+            if av in (0, None) or av == base.localAvatar.doId:
+                return sp
+        if spots:
+            return spots[0]
+        return None
+
+    def boardAndFish(self):
+        if not self.shouldContinue:
+            return
+        spot = self.findFreeSpot()
+        if spot is None:
+            Sequence(Wait(1), Func(self.boardAndFish)).start()
+            return
+        self.spot = spot
+        try:
+            base.localAvatar.setPos(spot.getPos(render))
+        except:
+            pass
+        # Turn the toon's collisions OFF so it can't trip a cog-building
+        # elevator/door trigger on the street while parked at the dock (that
+        # boards an elevator with no FSM and crashes the client).
+        try:
+            base.localAvatar.collisionsOff()
+        except:
+            pass
+        try:
+            spot.d_requestEnter()
+        except:
+            pass
+        # cast() itself waits until we're actually seated; this is just an
+        # initial grace period for the sit-down to register.
+        Sequence(Wait(3), Func(self.cast)).start()
+
+    # --------------------------------------------- catch / sell (freshollie)
+    # IMPORTANT: do not cast/hit until we are actually SEATED on the dock
+    # (spot.localToonFishing == 1). Casting early hits a pond whose localToonSpot
+    # is None -> crash/desync. cast() waits for the seat first.
+    def cast(self):
+        if not self.shouldContinue:
+            return
+        sp = self.spot
+        if sp is None or getattr(sp, 'localToonFishing', 0) != 1:
+            # not seated yet - let the dock finish loading and seat us
+            self.castTries = getattr(self, 'castTries', 0) + 1
+            if self.castTries < 40:
+                Sequence(Wait(0.5), Func(self.cast)).start()
+            else:
+                self.castTries = 0
+                self.boardAndFish()   # give up waiting, re-board
+            return
+        self.castTries = 0
+        try:
+            sp.d_doCast(0.9, 0.0)
+        except:
+            pass
+        Sequence(Wait(1.5), Func(self.catchFish)).start()
+
+    def catch(self):
+        base.localAvatar.wakeUp()
+        if not self.shouldContinue:
+            return
+        # only fish while genuinely seated
+        if getattr(self.spot, 'localToonFishing', 0) != 1:
+            return
+        targets = base.cr.doFindAll('FishingTarget')
+        if not targets:
+            return
+        fish = targets[0]
+        for fp in base.cr.doFindAll('FishingPond'):
+            # skip ponds we aren't seated at (localToonSpot None -> crash)
+            if getattr(fp, 'localToonSpot', None) is None:
+                continue
+            try:
+                fp.d_hitTarget(fish)
+                self.fishNum += 1
+            except:
+                pass
+
+    def catchFish(self):
+        if self.shouldContinue:
+            seq = Sequence()
+            for i in range(23):
+                seq.append(Func(self.catch))
+                seq.append(Wait(0.05))
+            seq.append(Wait(1))
+            seq.append(Func(self.sell))
+            seq.start()
+
+    def sell(self):
+        if not self.shouldContinue:
+            return
+        fisherman = base.cr.doFind('Fisherman')
+        if fisherman:
+            fisherman.sendUpdate('avatarEnter')
+            fisherman.sendUpdate('completeSale', [1])
+            Sequence(Wait(1), Func(self.afterSell)).start()
+        else:
+            self.autoerGui.display.newLine('No Fisherman here - selling at a playground')
+            self.walk()
+            try:
+                base.cr.playGame.getPlace().requestTeleport(self.sellHood, self.sellHood, None, None)
+            except:
+                pass
+            Sequence(Wait(5), Func(self.sellElsewhere)).start()
+
+    def sellElsewhere(self):
+        if not self.shouldContinue:
+            return
+        fisherman = base.cr.doFind('Fisherman')
+        if fisherman:
+            fisherman.sendUpdate('avatarEnter')
+            fisherman.sendUpdate('completeSale', [1])
+        Sequence(Wait(1), Func(self.afterSell)).start()
+
+    def afterSell(self):
+        if not self.shouldContinue:
+            return
+        self.reportNewFish()
+        targetDone = (self.currentTarget is None) or self.isOwned(self.currentTarget)
+        stillHere = False
+        if self.targetPond is not None:
+            for f in self.missingFish():
+                if self.huntableAt(f, self.targetPond):
+                    stillHere = True
+                    break
+        if targetDone or not stillHere:
+            self.run()
+        else:
+            if self.atZone(self.targetPond):
+                self.cast()
+            else:
+                self.proceed()
+
+    # --------------------------------------------------------------- options
+    # Which rod to use for catchability/rarity logic. Click your rod in the
+    # options; until you do, it auto-detects from your toon.
+    ROD_NAMES = {0: 'Twig', 1: 'Bamboo', 2: 'Hardwood', 3: 'Steel', 4: 'Gold'}
+
+    def rodFor(self):
+        if self.rodOverride is not None:
+            return self.rodOverride
+        try:
+            return base.localAvatar.getFishingRod()
+        except:
+            return 0
+
+    def setRod(self, rodId):
+        self.rodOverride = rodId
+        name = self.ROD_NAMES.get(rodId, str(rodId))
+        # Gold rod can land everything, so don't skip ultra-rares with it.
+        self.skipUltraRare = (rodId < 4)
+        base.localAvatar.setSystemMessage(0, 'Fish Maxer: Using %s Rod logic (skip ultra-rare = %s)' % (name, self.skipUltraRare))
+        self.autoerGui.display.newLine(name + ' Rod selected')
+
+    def setRodTwig(self):
+        self.setRod(0)
+
+    def setRodBamboo(self):
+        self.setRod(1)
+
+    def setRodHardwood(self):
+        self.setRod(2)
+
+    def setRodSteel(self):
+        self.setRod(3)
+
+    def setRodGold(self):
+        self.setRod(4)
+
+    def catchAllRarities(self):
+        self.skipUltraRare = False
+        base.localAvatar.setSystemMessage(0, 'Fish Maxer: Catching ALL rarities (incl. ultra-rare)')
+        self.autoerGui.display.newLine('Catching all rarities')
+
+    def skipUltra(self):
+        self.skipUltraRare = True
+        base.localAvatar.setSystemMessage(0, 'Fish Maxer: SKIPPING ultra-rare (rarity > %s)' % self.maxRarity)
+        self.autoerGui.display.newLine('Skipping ultra-rare fish')
+
+    def estateOn(self):
+        self.includeEstate = True
+        base.localAvatar.setSystemMessage(0, 'Fish Maxer: Estate pond INCLUDED')
+
+    def estateOff(self):
+        self.includeEstate = False
+        base.localAvatar.setSystemMessage(0, 'Fish Maxer: Estate pond EXCLUDED')
+
+    # Safety net: cog-building elevators on streets can crash the client in
+    # DistributedElevator.enterClosed -> __doorsClosed when localToonOnBoard is
+    # set but elevatorFSM is None (a stray boarding while botting). Wrap
+    # enterClosed so it can never take the client down. Installed while a
+    # FishMaxer instance exists; reverted on unload.
+    def installSafety(self):
+        try:
+            from toontown.building import DistributedElevator as _DE
+            cls = _DE.DistributedElevator
+            if not hasattr(cls, '_fmOrigEnterClosed'):
+                cls._fmOrigEnterClosed = cls.enterClosed
+
+                def _fmSafeEnterClosed(elevSelf, ts):
+                    try:
+                        cls._fmOrigEnterClosed(elevSelf, ts)
+                    except:
+                        pass
+                cls.enterClosed = _fmSafeEnterClosed
+        except:
+            pass
+
+    def removeSafety(self):
+        try:
+            from toontown.building import DistributedElevator as _DE
+            cls = _DE.DistributedElevator
+            if hasattr(cls, '_fmOrigEnterClosed'):
+                cls.enterClosed = cls._fmOrigEnterClosed
+                del cls._fmOrigEnterClosed
+        except:
+            pass
+
+    # ------------------------------------------------------------- lifecycle
+    def setStop(self):
+        self.autoerGui.stopTimer()
+        self.autoerGui.display.newLine('Stopped')
+        self.shouldContinue = False
+        self.removeStreetInterest()
+        self.restoreCollisions()
+
+    def revertFunctions(self):
+        self.restoreCollisions()
+        self.removeSafety()
+        self.autoerGui.destroy()
+
+fishMaxer = FishMaxer()
