@@ -82,12 +82,12 @@ These appear in the dashboard sidebar. A few example scripts are included — yo
 |--------|-------------|
 | `ToonTask-Autoer.py` | freshollie task autoer, requires TaskBot folder in main game folder. |
 | `SalemsSimpleButtons.txt` | A few buttons |
-| `pumpkinHEAD.txt` / `snowmanHEAD.txt` | Cosmetic head swaps |
+| `pumpkinHEAD.txt` / `snowmanHEAD.txt` | Cosmetic head  |
 
 ---
 
 ## Credits
 
-- **Original DLL hook**: TeamFD
+- **Original DLL injector**: TeamFD
 - **ToonBot** (in-game GUI framework): [freshollie](https://github.com/freshollie/ToonBot)
 - **Rewrite & dashboard**: SSalem00
