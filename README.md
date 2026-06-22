@@ -10,7 +10,7 @@ Uses the same DLL hook as the original **TeamFD injector** — patching `PyEval_
 
 If you prefer the original Win32 GUI, a decompiled and updated version of the old TeamFD DLL is included in `Source/decompiled TeamFD Injector/` — screenshots of both the original and updated versions are in there too.
 
-`TTsunriseInjector.exe` is the injector with a new UI — it launches Toontown launcher, waits for the game to load, and automatically hooks to the game PID. It also automatically reinjects to a new game process if the game crashes or closes.
+`TTsunriseInjector.exe` is the injector with a new UI — it launches Toontown launcher, waits 15 seconds for the game to load, and automatically hooks to the game PID. It also automatically reinjects to a new game process if the game crashes or closes.
 
 ---
 
@@ -19,7 +19,7 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
 ### Requirements
 - Toontown Sunrise installed at:  
   `C:\Program Files (x86)\Disney\Disney Online\ToontownOnline\`
-- Windows
+- Windows 10 or 11 (64-bit)
 - Run as **Administrator**
 
 ### Installation
@@ -43,7 +43,7 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
 
 ```
 pip install pyinstaller pyqt5
-pyinstaller --onefile --windowed --add-data "Source/TTHook.dll;TTInjector" Source/app.py -n ModdedLauncher
+pyinstaller --onefile --windowed --add-data "Source/TTHook.dll;TTInjector" Source/app.py -n TTsunriseInjector
 ```
 
 Copy `game\toonbot\` and `game\TaskBot\` into your Toontown install directory as above.
@@ -54,12 +54,13 @@ Copy `game\toonbot\` and `game\TaskBot\` into your Toontown install directory as
 
 1. **Run `TTsunriseInjector.exe` as Administrator**
 2. Log in through the Toontown launcher normally
-3. The injector waits ~15 seconds for the game to load, then injects and opens the dashboard
+3. The injector waits ~15 seconds for the game to load, then injects into the game PID
 4. Console will show `[+] bridge live on :8888` when ready
-5. Write or load a script in the editor and press **Ctrl+Enter** to run it in-game
+5. Write or load a script in the editor and press **EXECUTE SCRIPT** or **Ctrl+Enter** to run it in-game
 
-6. Also work if you already have the game opened.
-### Dashboard
+**Note:** `TTsunriseInjector.exe` opens the Toontown launcher for you, but you can also have the game already open and loaded — it will auto-inject to the running game PID either way.
+
+
 
 | Panel | Description |
 |-------|-------------|
@@ -76,18 +77,18 @@ The install includes [ToonBot](https://github.com/freshollie/ToonBot) and its Ta
 
 ### `toonbot\Injectables\` — Dashboard scripts
 
-These appear in the dashboard sidebar. A few example scripts are included — you can add your own `.txt` files here to quickly load and run any injector code instead of needing to copy and paste a code everytime. For more scripts, browse the [Scrap repo](https://github.com/ttcloopy/Scrap).
+These appear in the dashboard sidebar. A few example scripts are included — you can add your own `.txt` in toonbot\Injectables to quickly load and run any injector code instead of needing to copy and paste a code everytime. For more scripts, browse the [Scrap repo](https://github.com/ttcloopy/Scrap).
 
-| Script | What it does |
+| Bundled Example Scripts | What they do |
 |--------|-------------|
 | `ToonTask-Autoer.py` | freshollie task autoer, requires TaskBot folder in main game folder. |
 | `SalemsSimpleButtons.txt` | A few buttons |
 | `pumpkinHEAD.txt` / `snowmanHEAD.txt` | Cosmetic head  |
-
+ 
 ---
 
 ## Credits
 
 - **Original DLL injector**: TeamFD
 - **ToonBot** (in-game GUI framework): [freshollie](https://github.com/freshollie/ToonBot)
-- **Rewrite & dashboard**: SSalem00
+- **Rewrite & dashboard, added more fixes and features to ToonBot scripts**: SSalem00
