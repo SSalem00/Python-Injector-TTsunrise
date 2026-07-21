@@ -1,0 +1,517 @@
+from direct.interval.IntervalGlobal import *
+from toontown.estate import GardenGlobals
+from toontown.estate import DistributedGardenPlot
+from toontown.estate import DistributedFlower
+from toontown.estate import DistributedGagTree
+from toontown.estate import DistributedLawnDecor
+from toontown.estate import DistributedPlantBase
+from toontown.estate import DistributedEstate
+from toontown.toonbase import ToontownGlobals
+from toontown.hood import ZoneUtil
+
+
+class GardenMaxer:
+
+    DAY_SECONDS = 24 * 60 * 60
+
+    def __init__(self):
+        self.shouldContinue = False
+        self.dailyLoop = False         # re-run once a day while client is open
+        self.plantNew = True           # replant empty plots after harvest/water
+        self.sellAll = True            # sell the flower basket at the wheelbarrow
+        self.harvested = 0
+        self.watered = 0
+        self.planted = 0
+        self.sold = 0
+        self.loopTask = None
+        self.installSafety()
+        self.autoerGui = AutoerGui('Garden Maxer',
+                                   ['Run Time', 'Varieties Owned', 'Varieties Left', 'Harvested', 'Planted'],
+                                   ['self.formattedTime',
+                                    'str(gardenMaxer.ownedCount())',
+                                    'str(gardenMaxer.missingCount())',
+                                    'str(gardenMaxer.harvested)',
+                                    'str(gardenMaxer.planted)'],
+                                   'GARDEN MAXER', None)
+
+    # ---------------------------------------------------------- safety hooks
+    # Planting/harvesting normally plays a dig/water animation that ends by
+    # restoring the camera (unsetCameraPosForPetInteraction). Because the bot
+    # fires plantFlower/removeItem directly (it never ran the interaction that
+    # SETS prevIdealPos), that camera cleanup crashes the client. We replace the
+    # whole movie with an instant movieDone(): no animation, no camera ival, no
+    # crash - and planting/harvesting becomes instant. Same pattern as the Fish
+    # Maxer's elevator safety wrap.
+    SAFE_CLASSES = (DistributedLawnDecor.DistributedLawnDecor,
+                    DistributedPlantBase.DistributedPlantBase,
+                    DistributedGardenPlot.DistributedGardenPlot,
+                    DistributedFlower.DistributedFlower,
+                    DistributedGagTree.DistributedGagTree)
+
+    def installSafety(self):
+        for cls in self.SAFE_CLASSES:
+            try:
+                if '_gmOrigSetMovie' not in cls.__dict__:
+                    cls._gmOrigSetMovie = cls.__dict__.get('setMovie', None)
+
+                    def _gmSetMovie(decSelf, mode, avId):
+                        # Only WE complete the movie (skip other toons' visuals).
+                        try:
+                            if avId == base.localAvatar.doId:
+                                decSelf.movieDone()
+                        except:
+                            pass
+                    cls.setMovie = _gmSetMovie
+            except:
+                pass
+
+    def removeSafety(self):
+        for cls in self.SAFE_CLASSES:
+            try:
+                if '_gmOrigSetMovie' in cls.__dict__:
+                    orig = cls._gmOrigSetMovie
+                    if orig is None:
+                        try:
+                            del cls.setMovie       # restore inherited version
+                        except:
+                            pass
+                    else:
+                        cls.setMovie = orig
+                    del cls._gmOrigSetMovie
+            except:
+                pass
+
+    # -- data --
+    # Every (species, variety) flower in the game that is a NORMAL flower
+    # (special == -1; we skip gag-tree / statuary 'special' recipes).
+    def allVarieties(self):
+        out = []
+        try:
+            for species in GardenGlobals.getFlowerSpecies():
+                varieties = GardenGlobals.getFlowerVarieties(species)
+                for v in range(len(varieties)):
+                    recipeKey = varieties[v][0]
+                    recipe = GardenGlobals.Recipes.get(recipeKey)
+                    if recipe is None:
+                        continue
+                    if recipe.get('special', -1) != -1:
+                        continue
+                    out.append((species, v))
+        except:
+            pass
+        return out
+
+    def beansFor(self, species, variety):
+        try:
+            recipeKey = GardenGlobals.getFlowerVarieties(species)[variety][0]
+            return GardenGlobals.Recipes[recipeKey]['beans']
+        except:
+            return ''
+
+    def costFor(self, species, variety):
+        return len(self.beansFor(species, variety))
+
+    def isOwned(self, species, variety):
+        try:
+            return base.localAvatar.flowerCollection.hasFlower(species, variety)
+        except:
+            return 0
+
+    def flowerName(self, species, variety):
+        try:
+            from toontown.toonbase import TTLocalizer
+            return TTLocalizer.FlowerSpeciesNames[species]
+        except:
+            return 'S%s V%s' % (species, variety)
+
+    def ownedCount(self):
+        n = 0
+        for f in self.allVarieties():
+            if self.isOwned(f[0], f[1]):
+                n += 1
+        return n
+
+    def missingCount(self):
+        return len(self.allVarieties()) - self.ownedCount()
+
+    # Max number of beans we're allowed to plant with our current shovel skill.
+    # The server rejects any recipe longer than this, so we must respect it.
+    def maxBeans(self):
+        try:
+            shovel = getattr(base.localAvatar, 'shovel', 0)
+            skill = getattr(base.localAvatar, 'shovelSkill', 0)
+            return GardenGlobals.getShovelPower(shovel, skill)
+        except:
+            return 1
+
+    # Every uncollected variety we can plant with our current shovel, sorted
+    # cheapest first. We plant one DISTINCT variety per plot so a pass fills the
+    # garden with a spread of new flowers instead of 10 copies of one. (isOwned
+    # only flips when a flower is HARVESTED, not planted, so we can't lean on it
+    # to avoid dupes within a single pass, we track that ourselves in
+    # plantEmpties.)
+    def missingCandidates(self):
+        maxB = self.maxBeans()
+        out = []
+        for (s, v) in self.allVarieties():
+            if self.isOwned(s, v):
+                continue
+            c = self.costFor(s, v)
+            if c <= 0 or c > maxB:
+                continue
+            out.append((c, s, v))
+        out.sort()          # cheapest (fewest beans) first
+        return out
+
+    def getMoney(self):
+        try:
+            return base.localAvatar.getMoney()
+        except:
+            return 0
+
+    # -- estate / objects --
+    def inEstate(self):
+        # Estate zones are allocated dynamically, so getHoodId() doesn't reliably
+        # map to MyEstate. The robust signal is the active Place class being the
+        # Estate place. We also accept a couple of fallbacks just in case.
+        try:
+            if 'Estate' in base.cr.playGame.getPlace().__class__.__name__:
+                return True
+        except:
+            pass
+        try:
+            if 'Estate' in base.cr.playGame.hood.__class__.__name__:
+                return True
+        except:
+            pass
+        try:
+            if ZoneUtil.isEstate(base.localAvatar.getZoneId()):
+                return True
+        except:
+            pass
+        try:
+            if ZoneUtil.getHoodId(base.localAvatar.getZoneId()) == ToontownGlobals.MyEstate:
+                return True
+        except:
+            pass
+        return False
+
+    # Empty flower plots we own (planted plots become DistributedFlower instead).
+    def myFlowerPlots(self):
+        out = []
+        try:
+            plots = base.cr.doFindAllInstances(DistributedGardenPlot.DistributedGardenPlot)
+        except:
+            plots = []
+        for p in plots:
+            try:
+                if getattr(p, 'plotType', None) != GardenGlobals.FLOWER_TYPE:
+                    continue
+                if not p.canBePlanted():
+                    continue
+                out.append(p)
+            except:
+                pass
+        return out
+
+    # Flowers (already planted) that we own.
+    def myFlowers(self):
+        out = []
+        try:
+            flowers = base.cr.doFindAllInstances(DistributedFlower.DistributedFlower)
+        except:
+            flowers = []
+        for f in flowers:
+            try:
+                if f.getOwnerId() == base.localAvatar.doId:
+                    out.append(f)
+            except:
+                out.append(f)
+        return out
+
+    # Gag trees we own. We never harvest these (that's picking gags) - we only
+    # top off their water so they don't wilt while we're away.
+    def myTrees(self):
+        out = []
+        try:
+            trees = base.cr.doFindAllInstances(DistributedGagTree.DistributedGagTree)
+        except:
+            trees = []
+        for t in trees:
+            try:
+                if t.getOwnerId() == base.localAvatar.doId:
+                    out.append(t)
+            except:
+                out.append(t)
+        return out
+
+    def isReady(self, flower):
+        try:
+            return flower.isGTEFullGrown()
+        except:
+            try:
+                return flower.growthLevel >= flower.growthThresholds[1]
+            except:
+                return False
+
+    def needsWater(self, flower):
+        try:
+            return flower.waterLevel < flower.maxWaterLevel
+        except:
+            return True
+
+    # -- main pass --
+    def start(self):
+        self.shouldContinue = True
+        self.harvested = 0
+        self.watered = 0
+        self.planted = 0
+        self.sold = 0
+        self.autoerGui.startTimer()
+        if not self.inEstate():
+            try:
+                zid = base.localAvatar.getZoneId()
+                pname = base.cr.playGame.getPlace().__class__.__name__
+                self.autoerGui.display.newLine('Not estate? zone=%s place=%s' % (zid, pname))
+            except:
+                pass
+            self.autoerGui.display.newLine('Go to YOUR ESTATE first, then Start')
+            base.localAvatar.setSystemMessage(0, 'Garden Maxer: stand in your own estate before starting.')
+            self.setStop()
+            return
+        try:
+            started = base.localAvatar.getGardenStarted()
+        except:
+            started = True
+        if not started:
+            self.autoerGui.display.newLine('Start gardening at Toon HQ first (get a shovel)')
+            base.localAvatar.setSystemMessage(0, 'Garden Maxer: get your shovel from Toon HQ before gardening.')
+            self.setStop()
+            return
+        self.walk()
+        Sequence(Wait(1), Func(self.doPass)).start()
+
+    # A pass walks a queue of (action, object) steps with small waits between,
+    # so each sendUpdate has time to settle (mirrors the Fish Maxer pacing).
+    def doPass(self):
+        if not self.shouldContinue:
+            return
+        self.autoerGui.display.newLine('--- Daily garden pass ---')
+        seq = Sequence()
+        # 0. Sell whatever is already in the basket so there's room to pick.
+        seq.append(Func(self.sellBasket))
+        seq.append(Wait(1.5))
+        # 1. Harvest everything that's ready (picked flowers go to the basket).
+        for f in self.myFlowers():
+            if self.isReady(f):
+                seq.append(Func(self.harvest, f))
+                seq.append(Wait(1.0))
+        # 2. Sell everything we just picked (frees jellybeans for replanting).
+        seq.append(Func(self.sellBasket))
+        seq.append(Wait(1.5))
+        # 3. Replant the freed/empty plots.
+        seq.append(Wait(2))
+        seq.append(Func(self.plantEmpties))
+        # 4. Wait for the newly-planted flower DOs to generate, THEN water every
+        #    flower that needs it - both the ones we just planted and any older
+        #    ones still growing. (Watering must come last so fresh plants count.)
+        #    waterAll chains into finishPass itself, so finishPass can't fire
+        #    mid-watering and stop the bot early.
+        seq.append(Wait(3))
+        seq.append(Func(self.waterAll))
+        seq.start()
+
+    # Water every flower of ours that isn't full and isn't maxed on water, then
+    # finish the pass once all the watering steps have run.
+    def waterAll(self):
+        if not self.shouldContinue:
+            return
+        wseq = Sequence()
+        for f in self.myFlowers():
+            if not self.isReady(f) and self.needsWater(f):
+                wseq.append(Func(self.water, f))
+                wseq.append(Wait(1.0))
+        # Top off gag trees too (water any that aren't full - grown or not, since
+        # we never harvest trees, we just keep them from wilting).
+        for t in self.myTrees():
+            if self.needsWater(t):
+                wseq.append(Func(self.water, t))
+                wseq.append(Wait(1.0))
+        wseq.append(Func(self.finishPass))
+        wseq.start()
+
+    def harvest(self, flower):
+        if not self.shouldContinue:
+            return
+        try:
+            base.localAvatar.setPos(flower.getPos(render))
+        except:
+            pass
+        try:
+            flower.sendUpdate('removeItem', [])
+            self.harvested += 1
+            self.autoerGui.display.newLine('Harvested ' + self.flowerName(flower.getSpecies(), flower.getVariety()))
+        except:
+            pass
+
+    def water(self, flower):
+        if not self.shouldContinue:
+            return
+        try:
+            base.localAvatar.setPos(flower.getPos(render))
+        except:
+            pass
+        try:
+            flower.sendUpdate('waterPlant')
+            self.watered += 1
+        except:
+            pass
+        # Some servers only commit the water level on the "done" update.
+        try:
+            flower.sendUpdate('waterPlantDone')
+        except:
+            pass
+
+    # Sell the entire flower basket at the wheelbarrow. The estate DO handles
+    # the sale: completeFlowerSale([1]) cashes in everything in the basket.
+    def sellBasket(self):
+        if not self.shouldContinue or not self.sellAll:
+            return
+        try:
+            count = len(base.localAvatar.flowerBasket.flowerList)
+        except:
+            count = 0
+        if count <= 0:
+            return
+        estate = self.getEstate()
+        if estate is None:
+            self.autoerGui.display.newLine('No estate DO found - cannot sell')
+            return
+        try:
+            estate.sendUpdate('completeFlowerSale', [1])
+            self.sold += count
+            self.autoerGui.display.newLine('Sold %s flowers from the basket' % count)
+        except:
+            pass
+
+    def getEstate(self):
+        try:
+            ests = base.cr.doFindAllInstances(DistributedEstate.DistributedEstate)
+            if ests:
+                return ests[0]
+        except:
+            pass
+        try:
+            return base.cr.doFind('Estate')
+        except:
+            return None
+
+    def plantEmpties(self):
+        if not self.shouldContinue or not self.plantNew:
+            return
+        candidates = self.missingCandidates()
+        money = self.getMoney()
+        idx = 0
+        for plot in self.myFlowerPlots():
+            # Advance to the next candidate we can still afford. Each plant
+            # spends jellybeans equal to its bean count, so drop 'money' as we go.
+            while idx < len(candidates) and candidates[idx][0] > money:
+                idx += 1
+            if idx >= len(candidates):
+                self.autoerGui.display.newLine('No more affordable new varieties this pass')
+                break
+            c, s, v = candidates[idx]
+            idx += 1                 # each variety used at most once per pass
+            money -= c
+            try:
+                base.localAvatar.setPos(plot.getPos(render))
+            except:
+                pass
+            try:
+                plot.sendUpdate('plantFlower', [s, v])
+                self.planted += 1
+                self.autoerGui.display.newLine('Planted ' + self.flowerName(s, v) +
+                                               ' (' + self.beansFor(s, v) + ')')
+            except:
+                pass
+
+    def finishPass(self):
+        if not self.shouldContinue:
+            return
+        self.autoerGui.display.newLine('Pass done: harvested %s, watered %s, sold %s, planted %s'
+                                       % (self.harvested, self.watered, self.sold, self.planted))
+        base.localAvatar.setSystemMessage(0, 'Garden Maxer: pass done - %s harvested, %s watered, %s sold, %s planted.'
+                                          % (self.harvested, self.watered, self.sold, self.planted))
+        if self.dailyLoop:
+            self.autoerGui.display.newLine('Daily loop ON - next pass in ~24h')
+            self.loopTask = Sequence(Wait(self.DAY_SECONDS), Func(self.repeat))
+            self.loopTask.start()
+        else:
+            self.setStop()
+
+    def repeat(self):
+        if not self.shouldContinue:
+            return
+        self.harvested = 0
+        self.planted = 0
+        self.watered = 0
+        self.sold = 0
+        if self.inEstate():
+            self.doPass()
+        else:
+            self.autoerGui.display.newLine('Not in estate at loop time - skipping, retry in 1h')
+            self.loopTask = Sequence(Wait(3600), Func(self.repeat))
+            self.loopTask.start()
+
+    def walk(self):
+        try:
+            base.cr.playGame.getPlace().fsm.forceTransition('walk')
+        except:
+            pass
+
+    # -- options --
+    def loopOn(self):
+        self.dailyLoop = True
+        base.localAvatar.setSystemMessage(0, 'Garden Maxer: Daily loop ON (re-runs every 24h while open)')
+        self.autoerGui.display.newLine('Daily loop ON')
+
+    def loopOff(self):
+        self.dailyLoop = False
+        base.localAvatar.setSystemMessage(0, 'Garden Maxer: Daily loop OFF (single pass)')
+        self.autoerGui.display.newLine('Daily loop OFF')
+
+    def plantOn(self):
+        self.plantNew = True
+        self.autoerGui.display.newLine('Replanting ON')
+
+    def plantOff(self):
+        self.plantNew = False
+        self.autoerGui.display.newLine('Replanting OFF (harvest/water only)')
+
+    def sellOn(self):
+        self.sellAll = True
+        base.localAvatar.setSystemMessage(0, 'Garden Maxer: Auto-sell ON (cashes in the whole basket)')
+        self.autoerGui.display.newLine('Auto-sell ON')
+
+    def sellOff(self):
+        self.sellAll = False
+        base.localAvatar.setSystemMessage(0, 'Garden Maxer: Auto-sell OFF (keep flowers in basket)')
+        self.autoerGui.display.newLine('Auto-sell OFF')
+
+    # --lifecycle --
+    def setStop(self):
+        self.shouldContinue = False
+        if self.loopTask is not None:
+            try:
+                self.loopTask.pause()
+            except:
+                pass
+            self.loopTask = None
+        self.autoerGui.stopTimer()
+        self.autoerGui.display.newLine('Stopped')
+
+    def revertFunctions(self):
+        self.removeSafety()
+        self.autoerGui.destroy()
+
+gardenMaxer = GardenMaxer()
