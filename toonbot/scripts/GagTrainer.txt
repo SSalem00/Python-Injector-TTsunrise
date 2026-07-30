@@ -134,8 +134,11 @@ class Inventory:
         self.inBattle=False
         self.shouldResetClock=False
         self.numberToName=['ToonUp','Trap','Lure','Sound','Throw','Squirt','Drop']
+        #Self-heal with a Toon-up gag as a 3rd gag below healThreshold.
+        self.healWithToonup=True
+        self.healThreshold=0.75
 
-        
+
     def getInv(self,command):
         if command=="get1":
             try:
@@ -300,6 +303,14 @@ class Inventory:
     def useLevelsFalse(self):
         self.useOwnLevels=False
         base.localAvatar.setSystemMessage(0,'Gag trainer set to not use levels')
+
+    def healToonupOn(self):
+        self.healWithToonup=True
+        base.localAvatar.setSystemMessage(0,'Gag trainer will heal with toon-up gags when low',5)
+
+    def healToonupOff(self):
+        self.healWithToonup=False
+        base.localAvatar.setSystemMessage(0,'Gag trainer toon-up healing off',5)
     
     def resetTrack1XpGained(self):
         self.shouldResetClock=True
@@ -481,7 +492,9 @@ class Restock:
             desiredLevel2=5
             
         self.desiredInv=""
-            
+        healOn=self.canHealToonup()
+        healLvl=self.healLevel()
+
         for i in range(7*7):
             if i==((self.firstTrack*7)+desiredLevel1):
                 if desiredLevel1>3:
@@ -509,10 +522,17 @@ class Restock:
                 else:
                     self.desiredInv+="\x04"
 
+            elif healOn and i==healLvl:
+                #Only a few heal gags - overshooting the jar max voids the whole buy.
+                self.desiredInv+="\x04"
+
             else:
                 self.desiredInv+="\x00"
-    
-        if base.localAvatar.inventory.inventory[self.firstTrack][self.executeGags("return1")]<2 or base.localAvatar.inventory.inventory[self.secondTrack][self.executeGags("return2")]<2:
+
+        needBuy=base.localAvatar.inventory.inventory[self.firstTrack][self.executeGags("return1")]<2 or base.localAvatar.inventory.inventory[self.secondTrack][self.executeGags("return2")]<2
+        if healOn:
+            needBuy=needBuy or base.localAvatar.inventory.inventory[0][healLvl]<2
+        if needBuy:
             Sequence(Func(self.loadGagshop),Wait(1),Func(self.buyGags),Wait(0.5),Func(self.unloadGagshop)).start()
         
     def gainLaff(self):
@@ -525,6 +545,25 @@ class Restock:
             self.toonUp=base.cr.addInterest(base.localAvatar.defaultShard, zone, description='5', event=None)
             Sequence(Wait(1.0),Func(self.collectLaff),Func(base.cr.removeInterest, self.toonUp)).start()
     
+    def canHealToonup(self):
+        #Skip if we're already training Toon-up - that heals on its own.
+        try:
+            return (self.inventory.healWithToonup and base.localAvatar.getTrackAccess()[0]
+                    and self.inventory.firstTrack!=0 and self.inventory.secondTrack!=0)
+        except:
+            return False
+
+    def healLevel(self):
+        #Highest usable Toon-up level, skipping the single-target ones.
+        lvl=base.localAvatar.experience.getExpLevel(0)
+        if lvl==6:
+            lvl=5
+        if lvl in [1,3,5]:
+            lvl-=1
+        if lvl<0:
+            lvl=0
+        return lvl
+
     def gag(self,battle,track,level,toAttack):
         battle.sendUpdate('requestAttack', [track, level, toAttack])
         battle.sendUpdate('movieDone')
@@ -574,12 +613,22 @@ class Restock:
                     else:
                         toAttack2=battle.suits[0].doId
                         
+                    #Heal first - a gag thrown after the kill never lands.
+                    if self.canHealToonup() and base.localAvatar.getHp()<base.localAvatar.getMaxHp()*self.inventory.healThreshold:
+                        healLvl=self.healLevel()
+                        if base.localAvatar.inventory.inventory[0][healLvl]>0:
+                            self.gag(battle,0,healLvl,base.localAvatar.doId)
+                            try:
+                                gagTrainer.autoerGui.display.newLine('Healing with toon-up')
+                            except:
+                                pass
+
                     if base.localAvatar.inventory.inventory[firstTrack][desiredLevel1]>0:
                         self.gag(battle,firstTrack,desiredLevel1,toAttack1)
-                        
+
                     if base.localAvatar.inventory.inventory[secondTrack][desiredLevel2]>0:
                         self.gag(battle,secondTrack,desiredLevel2,toAttack2)
-                                        
+
                 except:
                     pass
         

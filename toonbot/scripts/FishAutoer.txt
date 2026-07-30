@@ -15,15 +15,11 @@ class FishingAutoer:
     def catch(self):
         base.localAvatar.wakeUp()
         if self.shouldContinue:
-           # try:
             fish = base.cr.doFindAll("FishingTarget")[0]
             for fp in base.cr.doFindAll("FishingPond"):
                 fp.d_hitTarget(fish)
                 self.fishNum+=1
-            #except:
-                #self.setStop()
-               # self.autoerGui.display.newLine("Not at fishing spot")
-            
+
     def catchFish(self):
         if self.shouldContinue:
             catchFishSeq=Sequence()

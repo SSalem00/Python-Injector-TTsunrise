@@ -1,0 +1,10 @@
+#Quick synchronous bean check - bank the wallet then print the total so the injector
+#console captures it. Inject AFTER firing a money unite to confirm it credited.
+try:
+    _w = base.localAvatar.getMoney()
+    if _w > 0:
+        base.cr.bankManager.d_transferMoney(_w)
+except:
+    pass
+print 'CheckBeans: total =', base.localAvatar.getTotalMoney(), '| wallet =', base.localAvatar.getMoney()
+base.localAvatar.setSystemMessage(0, 'Total beans: ' + str(base.localAvatar.getTotalMoney()))

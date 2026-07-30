@@ -72,6 +72,27 @@ def newInit(self, cr):
 def newWalk(self, a, b, c, d=0, e=0):
     pass
 
+#Swallow a client-bug KeyError in TelemetryLimiter.removeObj.
+try:
+    from otp.distributed import TelemetryLimiter as _TLmod
+    def _makeSafeRemoveObj(_old):
+        def _safeRemoveObj(self, *args, **kwds):
+            try:
+                return _old(self, *args, **kwds)
+            except:
+                return None
+        return _safeRemoveObj
+    for _tlClsName in dir(_TLmod):
+        _tlCls = getattr(_TLmod, _tlClsName, None)
+        #Only classes have __bases__.
+        if getattr(_tlCls, '__bases__', None) is not None and hasattr(_tlCls, 'removeObj'):
+            try:
+                _tlCls.removeObj = _makeSafeRemoveObj(_tlCls.removeObj)
+            except:
+                pass
+except:
+    pass
+
 
 class restock:
 
@@ -196,17 +217,15 @@ class restock:
         for x in base.cr.doFindAll('Treasure'):
             x.setPosition(0, 0, 8**8)
  
-        for x in base.cr.doFindAll('render/DistributedFishingTarget'):
-            x.bubbles.removeNode()
-            x.removeNode()
-                
     def gainLaff(self):
         if base.localAvatar.getHp()!=base.localAvatar.getMaxHp():
-            if self.unloaded:
+            #Add the heal interest once per district - re-adding every cycle churns it.
+            if self.unloaded or getattr(self,'healShard',None)!=base.localAvatar.defaultShard:
                 cfoMaxer.mintAutoer.preTele()
                 self.interest1=base.cr.addInterest(base.localAvatar.defaultShard, 9000, 5, None)
                 self.interest2=base.cr.addInterest(base.localAvatar.defaultShard, 3000, 5, None)
                 self.unloaded=False
+                self.healShard=base.localAvatar.defaultShard
             self.collectLaff()
         if self.wasInBattle:
             cfoMaxer.mintAutoer.enterBattle()
@@ -299,7 +318,7 @@ class OtherFunctions:
         DistributedBoardingParty.DistributedBoardingParty.postInvite=lambda newSelf,leaderId,inviterId: self.newPostInvite(newSelf,leaderId,inviterId)
 
     def getThrowTarget(self, battle):
-        #Pick a Cog based on our likelihood of killing it. If we can kill multiple targets, the highest level Cog will be targeted.
+        #Prefer the highest-level Cog we can kill this turn.
             throwTarget = None
             lowestLvlSuit = None
             throwDmg = ToontownBattleGlobals.getAvPropDamage(4, cfoMaxer.restock.desiredLevel3, base.localAvatar.experience.getExp(4), base.localAvatar.checkGagBonus(4, cfoMaxer.restock.desiredLevel3))
@@ -307,8 +326,7 @@ class OtherFunctions:
                 suitLvl = suit.getActualLevel()
                 if lowestLvlSuit is None or lowestLvlSuit.getActualLevel() > suitLvl:
                     lowestLvlSuit = suit
-                    
-                #Check for if this Cog will have knockback.
+
                 hasKb = False
                 try:
                     hasKb = battle.suits.index(suit) == battle.activeSuits.index(suit) and battle.isSuitLured(suit)
@@ -324,10 +342,9 @@ class OtherFunctions:
                         throwTarget = suit
                         
             if throwTarget is None:
-                #If we can't kill any targets... attack the lowest level Cog for the quickest kill.
+                #Can't kill anything: hit the lowest-level Cog for the quickest kill.
                 throwTarget = lowestLvlSuit
                 if throwTarget is None:
-                    #Just attack something.
                     throwTarget = battle.suits[0]
                     
             return throwTarget
@@ -441,6 +458,11 @@ class OtherFunctions:
                 if cfoMaxer.jellybeanFarmer.shouldFarm():
                     cfoMaxer.jellybeanFarmer.startFarming()
                     return
+                #Hop districts so despawned treasures reload.
+                if getattr(self,'wantDistrictHop',False):
+                    if self.hopToFreshDistrict():
+                        return
+                    self.wantDistrictHop=False
                 if self.getCogbucksLeft()==0 and not self.onlyMint:
                     if base.cr.doFind('DistributedCogHQDoor') and base.localAvatar.getZoneId()>=12000 and base.localAvatar.getZoneId()<12100:
                         cfoMaxer.cfoAutoer.start()
@@ -535,6 +557,44 @@ class OtherFunctions:
         else:
             pass
         
+    def useResistanceUnite(self,menuType):
+        #Use one owned unite of menuType on ourselves.
+        try:
+            from toontown.chat import ResistanceChat
+            msgs=base.localAvatar.resistanceMessages
+        except:
+            return False
+        for pair in msgs:
+            try:
+                textId,charges=pair[0],pair[1]
+                matches=charges>0 and ResistanceChat.decodeId(textId)[0]==menuType
+            except:
+                continue
+            if not matches:
+                continue
+            try:
+                base.localAvatar.sendUpdate('reqSCResistance',[textId,[base.localAvatar.doId]])
+                return True
+            except:
+                return False
+        return False
+
+    def useToonupUnite(self):
+        #Heal off a Toon-up unite.
+        try:
+            from toontown.chat import ResistanceChat
+        except:
+            return False
+        return self.useResistanceUnite(ResistanceChat.RESISTANCE_TOONUP)
+
+    def useMoneyUnite(self):
+        #Jellybeans off a Money unite.
+        try:
+            from toontown.chat import ResistanceChat
+        except:
+            return False
+        return self.useResistanceUnite(ResistanceChat.RESISTANCE_MONEY)
+
     def setStop(self):
         self.shouldEnd=True
         base.localAvatar.setSystemMessage(1,"The Autoer will stop at the end of this run")
@@ -558,7 +618,44 @@ class OtherFunctions:
         else:
             self.checkCogbucks()
         cfoMaxer.restock.noToons.loop()
-    
+        #Arm a 15-min district hop; applied between runs, never mid-mint.
+        self.wantDistrictHop=False
+        self.districtHopToken=getattr(self,'districtHopToken',0)+1
+        self.scheduleDistrictHop(self.districtHopToken)
+
+    def scheduleDistrictHop(self,token):
+        Sequence(Wait(900),Func(self.fireDistrictHop,token)).start()
+
+    def fireDistrictHop(self,token):
+        #Only the newest timer keeps looping.
+        if token!=getattr(self,'districtHopToken',0) or not self.shouldContinue:
+            return
+        self.wantDistrictHop=True
+        self.scheduleDistrictHop(token)
+
+    def hopToFreshDistrict(self,label='Refreshing district (15 min)'):
+        #Hop to an empty Cashbot HQ district. True if a hop started.
+        self.wantDistrictHop=False
+        cur=base.localAvatar.defaultShard
+        empties=[]
+        try:
+            for shard in base.cr.activeDistrictMap:
+                if shard==cur:
+                    continue
+                if base.cr.activeDistrictMap[shard].avatarCount<30:
+                    empties.append(shard)
+        except:
+            pass
+        if empties==[]:
+            return False
+        cfoMaxer.autoerGui.display.newLine(label)
+        self.walk()
+        try:
+            base.cr.playGame.getPlace().requestTeleport(12000,12000,random.choice(empties),None)
+            return True
+        except:
+            return False
+
     def revertFunctions(self):
         LocalToon.LocalToon.setAnimState=self.oldSetAnim
         DLPlayground.DLPlayground.__init__=self.oldDreamlandInit
@@ -697,19 +794,24 @@ class MintAutoer:
                 suitIndex = SuitDNA.suitHeadTypes.index(potentialSuit)
                 if base.localAvatar.hasCogSummons(suitIndex, 'invasion'):
                     base.localAvatar.d_reqCogSummons('invasion', suitIndex)
-                    #We don't *actually* care about the response here. If it failed, that means there's already an invasion running, so it's whatever.
                     break
         if base.localAvatar.getHp()>0:
+            mint = base.cr.doFind('DistributedMint.DistributedMint')
+            if mint is None:
+                return False
+            mintRoom = base.cr.doFind('DistributedMintRoom '+str(self.floorNumToLastRoomNum[mint.floorNum]))
+            if mintRoom is None:
+                return False
             battles = []
             cogList = base.cr.doFindAll("render")
             for x in cogList:
                 if isinstance(x, DistributedMintSuit):
                     if x.activeState == 6:
-                        if x.doId not in base.cr.doFind('DistributedMintRoom '+str(self.floorNumToLastRoomNum[base.cr.doFind('DistributedMint.DistributedMint').floorNum])).suitIds and not self.finalDone:
+                        if x.doId not in mintRoom.suitIds and not self.finalDone:
                             battles.append(x)
-                        elif self.finalDone and x.doId in base.cr.doFind('DistributedMintRoom '+str(self.floorNumToLastRoomNum[base.cr.doFind('DistributedMint.DistributedMint').floorNum])).suitIds:
+                        elif self.finalDone and x.doId in mintRoom.suitIds:
                             battles.append(x)
-                            
+
             if battles != []:
                 battle=battles[0]
                 pos, hpr = battle.getPos(), battle.getHpr()
@@ -798,6 +900,36 @@ class MintAutoer:
         Sequence(Wait(1),Func(cfoMaxer.otherFunctions.walk),Func(base.localAvatar.collisionsOff)).start()
         cfoMaxer.restock.wasInBattle=True
         cfoMaxer.autoerGui.display.newLine('Died, recovering')
+        #Watchdog: give recovery 2 min to clear wasInBattle, else restart at Cashbot HQ.
+        self.recoverTries=0
+        Sequence(Wait(6),Func(self.recoverWatchdog)).start()
+
+    def recoverWatchdog(self):
+        #Recovered or bot stopped.
+        if not (cfoMaxer.otherFunctions.shouldContinue and cfoMaxer.restock.wasInBattle):
+            return
+        self.recoverTries+=1
+        #Still dead: unite-heal every couple cycles while we have unites.
+        if base.localAvatar.getHp()<=0 and self.recoverTries>=2 and self.recoverTries%2==0:
+            if cfoMaxer.otherFunctions.useToonupUnite():
+                cfoMaxer.autoerGui.display.newLine('Force healing with unite')
+        #Wait the full 2 min before giving up.
+        if self.recoverTries<20:
+            Sequence(Wait(6),Func(self.recoverWatchdog)).start()
+            return
+        #Dead end - hop to a district with treasures, else teleBack.
+        cfoMaxer.restock.wasInBattle=False
+        cfoMaxer.otherFunctions.isHealing=False
+        self.attackSeq.finish()
+        self.gainLaffSeq.finish()
+        self.generateAgain()
+        try:
+            base.localAvatar.collisionsOn()
+        except:
+            pass
+        cfoMaxer.otherFunctions.walk()
+        if not cfoMaxer.otherFunctions.hopToFreshDistrict('Recovery stuck, switching district'):
+            cfoMaxer.otherFunctions.teleBack()
 
     def newEnterMintReward(self,*args):
         self.oldEnterMintReward(*args)
@@ -834,6 +966,26 @@ class JellybeanFarmer:
         self.farming=False
         self._noToonsRunning=False
 
+    def inCurrentShard(self,do):
+        #Old-shard objects linger after a hop; a doId floors to its district id.
+        try:
+            return (do.doId-(do.doId%1000000))==base.localAvatar.defaultShard
+        except:
+            return False
+
+    def firstInShard(self,className):
+        for do in base.cr.doFindAll(className):
+            if self.inCurrentShard(do):
+                return do
+        return None
+
+    def spotsInShard(self):
+        spots=[]
+        for s in base.cr.doFindAll('DistributedFishingSpot'):
+            if self.inCurrentShard(s):
+                spots.append(s)
+        return spots
+
     def shouldFarm(self):
         try:
             if base.localAvatar.cogLevels[0]==49:
@@ -847,13 +999,45 @@ class JellybeanFarmer:
             return
         self.farming=True
         self.maxer.autoerGui.display.newLine('Low on jellybeans')
-        self.maxer.autoerGui.display.newLine('Fishing at Dreamland')
         try:
             self._noToonsRunning=self.maxer.restock.noToons.isPlaying()
-            if self._noToonsRunning:
-                self.maxer.restock.noToons.finish()
+            self.maxer.restock.noToons.finish()
         except:
             self._noToonsRunning=False
+        #Beans from unites first; fish only if we have none.
+        if self.tryBeanUnite():
+            return
+        self.beginFishing()
+
+    def tryBeanUnite(self):
+        #Use one Money unite, then check the total after it lands. True if used.
+        if not self.farming:
+            return False
+        if self.maxer.otherFunctions.useMoneyUnite():
+            self.maxer.autoerGui.display.newLine('Using jellybean unite')
+            Sequence(Wait(1.5),Func(self.afterBeanUnite)).start()
+            return True
+        return False
+
+    def afterBeanUnite(self):
+        if not self.farming:
+            return
+        try:
+            total=base.localAvatar.getTotalMoney()
+        except:
+            total=0
+        self.maxer.autoerGui.display.newLine('Jellybeans: '+str(total))
+        if total>=self.BANK_FULL:
+            self.stopFarming()
+            return
+        #Still low: another unite, else fish.
+        if not self.tryBeanUnite():
+            self.beginFishing()
+
+    def beginFishing(self):
+        if not self.farming:
+            return
+        self.maxer.autoerGui.display.newLine('Fishing at Dreamland')
         self.maxer.otherFunctions.walk()
         Sequence(Wait(1),Func(self.goDreamland)).start()
 
@@ -868,7 +1052,18 @@ class JellybeanFarmer:
     def enterPond(self):
         if not self.farming:
             return
-        spots=base.cr.doFindAll('DistributedFishingSpot')
+        #No Fisherman means the NPCs unloaded - hop rather than fish a dead end.
+        if not self.firstInShard('Fisherman'):
+            self.noFisherTries=getattr(self,'noFisherTries',0)+1
+            if self.noFisherTries>=3:
+                self.noFisherTries=0
+                self.hopDistrict()
+            else:
+                Sequence(Wait(2),Func(self.enterPond)).start()
+            return
+        self.noFisherTries=0
+        #Stale spots never spawn fish.
+        spots=self.spotsInShard()
         if spots==[]:
             Sequence(Wait(2),Func(self.enterPond)).start()
             return
@@ -879,12 +1074,51 @@ class JellybeanFarmer:
         self.maxer.autoerGui.display.newLine('Fishing for jellybeans')
         Sequence(Wait(2),Func(self.catchFish)).start()
 
+    def hopDistrict(self):
+        #Hop districts to refresh the unloaded NPCs so the Fisherman reappears.
+        if not self.farming:
+            return
+        self.maxer.autoerGui.display.newLine('No fisherman here, switching district')
+        cur=base.localAvatar.defaultShard
+        others=[]
+        populated=[]
+        try:
+            for shard in base.cr.activeDistrictMap:
+                if shard==cur:
+                    continue
+                others.append(shard)
+                if base.cr.activeDistrictMap[shard].avatarCount>0:
+                    populated.append(shard)
+        except:
+            pass
+        if populated:
+            pool=populated
+        else:
+            pool=others
+        try:
+            self.maxer.otherFunctions.walk()
+        except:
+            pass
+        if pool:
+            try:
+                base.cr.playGame.getPlace().requestTeleport(self.DREAMLAND_ZONE,self.DREAMLAND_ZONE,random.choice(pool),None)
+            except:
+                pass
+        Sequence(Wait(5),Func(self.enterPond)).start()
+
     def catch(self):
         try:
             base.localAvatar.wakeUp()
-            fish=base.cr.doFindAll('FishingTarget')[0]
+            fish=None
+            for t in base.cr.doFindAll('FishingTarget'):
+                if self.inCurrentShard(t):
+                    fish=t
+                    break
+            if fish is None:
+                return
             for fp in base.cr.doFindAll('FishingPond'):
-                fp.d_hitTarget(fish)
+                if self.inCurrentShard(fp):
+                    fp.d_hitTarget(fish)
         except:
             pass
 
@@ -902,13 +1136,15 @@ class JellybeanFarmer:
     def sell(self):
         if not self.farming:
             return
-        fisherman=base.cr.doFind('Fisherman')
-        if fisherman:
-            try:
-                fisherman.sendUpdate('avatarEnter')
-                fisherman.sendUpdate('completeSale',[1])
-            except:
-                pass
+        fisherman=self.firstInShard('Fisherman')
+        if not fisherman:
+            self.hopDistrict()
+            return
+        try:
+            fisherman.sendUpdate('avatarEnter')
+            fisherman.sendUpdate('completeSale',[1])
+        except:
+            pass
         Sequence(Wait(1),Func(self.afterSell)).start()
 
     def afterSell(self):
@@ -939,7 +1175,28 @@ class JellybeanFarmer:
         except:
             pass
         self.maxer.otherFunctions.walk()
-        Sequence(Wait(1),Func(self.maxer.otherFunctions.teleBack)).start()
+        #Return to an empty district so runs stay solo.
+        Sequence(Wait(1),Func(self.returnToEmptyDistrict)).start()
+
+    def returnToEmptyDistrict(self):
+        empties=[]
+        try:
+            for shard in base.cr.activeDistrictMap:
+                if base.cr.activeDistrictMap[shard].avatarCount<30:
+                    empties.append(shard)
+        except:
+            pass
+        try:
+            self.maxer.otherFunctions.walk()
+        except:
+            pass
+        try:
+            if empties:
+                base.cr.playGame.getPlace().requestTeleport(12000,12000,random.choice(empties),None)
+            else:
+                self.maxer.otherFunctions.teleBack()
+        except:
+            self.maxer.otherFunctions.teleBack()
 
 class CFOmaxer:
 
@@ -955,6 +1212,10 @@ class CFOmaxer:
         self.jellybeanFarmer=JellybeanFarmer(self)
         
     def revert(self):
+        #Stop pending fishing steps before destroy(), or they hit the dead GUI.
+        self.jellybeanFarmer.farming=False
+        #Stop the district-hop timer so it can't fire after GUI teardown.
+        self.otherFunctions.districtHopToken=getattr(self.otherFunctions,'districtHopToken',0)+1
         self.restock.revertFunctions()
         self.mintAutoer.revertFunctions()
         self.cfoAutoer.revertFunctions()

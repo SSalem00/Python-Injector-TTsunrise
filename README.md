@@ -8,7 +8,7 @@ Python injector for Toontown Sunrise Games.
 
 Uses the same DLL hook as the original **TeamFD injector** — patching `PyEval_EvalCode` in `python24.dll` to intercept the game's Python interpreter. The original Win32 GUI has been replaced with a new PyQt5 dashboard with a working debug console.
 
-If you prefer the original Win32 GUI, a decompiled and updated version of the old TeamFD DLL is included in `Source/decompiled TeamFD Injector/` — screenshots of both the original and updated versions are in there too.
+If you prefer the original Win32 GUI, a decompiled and updated version of the old TeamFD DLL is included in `src/decompiled TeamFD Injector/` — screenshots of both the original and updated versions are in there too.
 
 `TTsunriseInjector.exe` is the injector with a new UI — it launches Toontown launcher, waits 15 seconds for the game to load, and automatically hooks to the game PID. It also automatically reinjects to a new game process if the game crashes or closes.
 
@@ -43,10 +43,10 @@ If you prefer the original Win32 GUI, a decompiled and updated version of the ol
 
 ```
 pip install pyinstaller pyqt5
-pyinstaller --onefile --windowed --add-data "Source/TTHook.dll;TTInjector" Source/app.py -n TTsunriseInjector
+pyinstaller --onefile --windowed --add-data "src/TTHook.dll;TTInjector" src/app.py -n TTsunriseInjector
 ```
 
-Copy `game\toonbot\` and `game\TaskBot\` into your Toontown install directory as above.
+Copy `toonbot\` and `TaskBot\` into your Toontown install directory as above.
 
 ---
 
@@ -82,7 +82,10 @@ These appear in the dashboard sidebar. A few example scripts are included — yo
 | Bundled Example Scripts | What they do |
 |--------|-------------|
 | `ToonTask-Autoer.py` | freshollie task autoer, requires TaskBot folder in main game folder. |
-| `SalemsSimpleButtons.txt` | A few buttons |
+| `SalemsButtons.txt` | A few buttons |
+| `SpikesButtons.txt` | A larger button set |
+| `CheckBeans.txt` | prints your bean count |
+| `UnstuckSELF.txt` | Teleports you to Donald's Dreamland if you get stuck |
 | `pumpkinHEAD.txt` / `snowmanHEAD.txt` | Cosmetic head  |
  
 ---

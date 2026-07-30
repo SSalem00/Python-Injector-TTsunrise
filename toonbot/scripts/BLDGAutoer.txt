@@ -212,7 +212,8 @@ class BuildingAutoer:
             self.shouldStop=False
             self.attackSeq.finish()
             self.invisibleSeq.finish()
-            self.autoerGui.display.newLine('Stopped')
+            if hasattr(self.autoerGui, 'display'):
+                self.autoerGui.display.newLine('Stopped')
     
     def findDistrictIds(self):
         self.shardIds=[]
@@ -358,7 +359,7 @@ class BuildingAutoer:
             Sequence(Func(self.loadGagshop),Wait(1),Func(self.buyGags),Wait(0.5),Func(self.unloadGagshop)).start()
         
     def getThrowTarget(self, battle):
-        #Pick a Cog based on our likelihood of killing it. If we can kill multiple targets, the highest level Cog will be targeted.
+        #Prefer the highest-level Cog we can kill this turn.
             throwTarget = None
             lowestLvlSuit = None
             throwDmg = ToontownBattleGlobals.getAvPropDamage(4, self.desiredLevel2, base.localAvatar.experience.getExp(4), base.localAvatar.checkGagBonus(4, self.desiredLevel2))
@@ -366,8 +367,7 @@ class BuildingAutoer:
                 suitLvl = suit.getActualLevel()
                 if lowestLvlSuit is None or lowestLvlSuit.getActualLevel() > suitLvl:
                     lowestLvlSuit = suit
-                    
-                #Check for if this Cog will have knockback.
+
                 hasKb = False
                 try:
                     hasKb = battle.suits.index(suit) == battle.activeSuits.index(suit) and battle.isSuitLured(suit)
@@ -383,10 +383,9 @@ class BuildingAutoer:
                         throwTarget = suit
                         
             if throwTarget is None:
-                #If we can't kill any targets... attack the lowest level Cog for the quickest kill.
+                #Can't kill anything: hit the lowest-level Cog for the quickest kill.
                 throwTarget = lowestLvlSuit
                 if throwTarget is None:
-                    #Just attack something.
                     throwTarget = battle.suits[0]
                     
             return throwTarget

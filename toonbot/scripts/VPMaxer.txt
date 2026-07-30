@@ -43,28 +43,28 @@ oldHandleEnterCollisionSphereParty=DistributedNPCPartyPerson.DistributedNPCParty
 DistributedNPCPartyPerson.DistributedNPCPartyPerson.handleCollisionSphereEnter=lambda *args: None
 oldHandleEnterCollisionSphereFisherman=DistributedNPCFisherman.DistributedNPCFisherman.handleCollisionSphereEnter
 DistributedNPCFisherman.DistributedNPCFisherman.handleEnterCollisionSphere=lambda *args: None
- 
+
 oldFisherAnnounceGenerate = DistributedNPCFisherman.DistributedNPCFisherman.announceGenerate
 def newFishermanAnnounceGenerate(self):
     try:
         oldFisherAnnounceGenerate(self)
     except:
         return None
-        
+
 oldFishermanInitToonState = DistributedNPCFisherman.DistributedNPCFisherman.initToonState
 def newFishermanInitToonState(self):
     try:
         oldFishermanInitToonState(self)
     except:
         return None
- 
+
 oldPartyPlannerAnnounceGenerate = DistributedNPCPartyPerson.DistributedNPCPartyPerson.announceGenerate
 def newPartyPlannerAnnounceGenerate(self):
     try:
         oldPartyPlannerAnnounceGenerate(self)
     except:
         return None
- 
+
 def newInit(self, cr):
     for obj in dir(self):
         exec 'self.%s = lambda *x:None' % obj
@@ -84,7 +84,7 @@ class restock:
             self.noToonUp=False
             self.secondTrack=0
             self.desiredLevel2=4
-            
+
         if not base.localAvatar.getTrackAccess()[2] or base.localAvatar.experience.getExpLevel(2)<5:
             self.noLure=True
             self.firstTrack=4
@@ -93,10 +93,10 @@ class restock:
             self.noLure=False
             self.firstTrack=2
             self.desiredLevel1=5
-            
+
         if base.localAvatar.experience.getExpLevel(4)<5:
             base.localAvatar.setSystemMessage(0,'You do not have the required throw level to run this.')
-            
+
         self.thirdTrack=4
         self.desiredLevel3=5
         self.createInventory()
@@ -117,23 +117,23 @@ class restock:
         DistributedChip.DistributedChip.setWalk = newWalk
         DistributedDale.DistributedDale.setWalk = newWalk
         DistributedDale.DistributedDale.setFollowChip = newWalk
-        
+
         DistributedNPCFisherman.DistributedNPCFisherman.announceGenerate = newFishermanAnnounceGenerate
         DistributedNPCFisherman.DistributedNPCFisherman.initToonState = newFishermanInitToonState
         DistributedNPCPartyPerson.DistributedNPCPartyPerson.announceGenerate = newPartyPlannerAnnounceGenerate
-        
+
         self.lookAroundHookSeq = Sequence(Func(self.lookAroundHookFunc), Wait(2.5))
         self.lookAroundHookSeq.loop()
         ToonHead.ToonHead._ToonHead__lookAround = lambda *x:None
-    
+
     def createInventory(self):
         self.desiredInv=""
         if self.desiredLevel1==6:
             self.desiredLevel1=5
-            
+
         if self.desiredLevel2==6:
             self.desiredLevel2=5
-            
+
         for i in range(49):
             if i==((self.firstTrack*7)+self.desiredLevel1):
                 if self.firstTrack==1:
@@ -158,18 +158,18 @@ class restock:
                     self.desiredInv+="\x04"
             else:
                 self.desiredInv+="\x00"
-        
+
     def lookAroundHookFunc(self):
         if hasattr(base, 'localAvatar'):
             base.localAvatar.findSomethingToLookAt = lambda *x:None
             self.oldFindSomethingToLookAt = base.localAvatar.findSomethingToLookAt
             self.lookAroundHookSeq.finish()
         self.oldLookAround = ToonHead.ToonHead._ToonHead__lookAround
-        
+
     def collectLaff(self):
         for treasure in base.cr.doFindAll('Treasure'):
             treasure.d_requestGrab()
-            
+
     def removeToons(self):
         for x in base.cr.doFindAll('Fisherman'):
             try:
@@ -178,7 +178,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.cr.doFindAll('Party Planner'):
             try:
                 if x.zoneId != base.localAvatar.zoneId:
@@ -186,7 +186,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
-           
+
         for x in base.cr.doFindAll('render/donald'):
             try:
                 if x.zoneId != base.localAvatar.zoneId:
@@ -194,7 +194,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.cr.doFindAll('render/minnie'):
             try:
                 if x.zoneId != base.localAvatar.zoneId:
@@ -202,7 +202,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.cr.doFindAll('render/mickey'):
             try:
                 if x.zoneId != base.localAvatar.zoneId:
@@ -210,7 +210,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.cr.doFindAll('render/pluto'):
             try:
                 if x.zoneId != base.localAvatar.zoneId:
@@ -218,7 +218,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.cr.doFindAll('render/daisy'):
             try:
                 if x.zoneId != base.localAvatar.zoneId:
@@ -226,7 +226,7 @@ class restock:
                     x.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.localAvatar.getNearbyPlayers(100000000000000, False):
             try:
                 y = base.cr.doId2do.get(x)
@@ -235,21 +235,17 @@ class restock:
                     y.nametag.unmanage(base.marginManager)
             except:
                 pass
- 
+
         for x in base.cr.doFindAll('Butterfly'):
             x.butterflyNode.remove()
- 
-        #for x in base.cr.doFindAll('Flower'):
-         #   print('test')
-            #x.bigFlower.removeNode()
- 
+
         for x in base.cr.doFindAll('Treasure'):
             x.setPosition(0, 0, 8**8)
- 
+
         for x in base.cr.doFindAll('render/DistributedFishingTarget'):
             x.bubbles.removeNode()
             x.removeNode()
-                
+
     def gainLaff(self):
         if base.localAvatar.getHp()!=base.localAvatar.getMaxHp():
             if self.unloaded:
@@ -260,8 +256,8 @@ class restock:
             self.collectLaff()
         if self.wasInBattle:
             vpMaxer.factoryAutoer.enterBattle()
-     
-    def loadGagshop(self):           
+
+    def loadGagshop(self):
         if not base.cr.doFind('Clerk'):
             self.contextId = base.cr.addInterest(base.localAvatar.defaultShard, self.gagshop_zoneId, '4', event=None)
         try:
@@ -271,11 +267,11 @@ class restock:
                     k.nametag.unmanage(base.marginManager)
         except:
             pass
-            
+
     def buyGags(self):
         desiredInv=self.desiredInv
         try:
-            maxCarryGags = base.localAvatar.getMaxCarry()     
+            maxCarryGags = base.localAvatar.getMaxCarry()
             if base.cr.doFind('Clerk'):
                 num_gags = 0
                 for inventory_number in base.localAvatar.inventory.makeFromNetString(desiredInv):
@@ -289,37 +285,36 @@ class restock:
                     clerk.freeAvatar=lambda *args: None
                     clerk.sendUpdate('avatarEnter')
                     clerk.sendUpdate('setInventory', [newString, change, 1])
-                    
+
                 money = base.localAvatar.getMoney()
                 maxMoney = base.localAvatar.getMaxMoney()
                 base.cr.bankManager.d_transferMoney(money - maxMoney)
         except:
             pass
-    
+
     def unloadGagshop(self):
         if hasattr(self, 'contextId'):
             try:
                 base.cr.removeInterest(self.contextId)
             except:
                 pass
-        
+
     def restock(self):
         try:
             if base.localAvatar.inventory.inventory[self.firstTrack][self.desiredLevel1]<2 or base.localAvatar.inventory.inventory[self.secondTrack][self.desiredLevel2]<2 or base.localAvatar.inventory.inventory[self.thirdTrack][self.desiredLevel3]<2:
                 Sequence(Func(self.loadGagshop),Wait(1),Func(self.buyGags),Wait(0.5),Func(self.unloadGagshop)).start()
-        
+
         except:
             pass
-    
+
     def revertFunctions(self):
-        #self.noToons.finish()
         try:
             base.cr.removeInterest(self.interest1)
             base.cr.removeInterest(self.interest2)
             self.unloaded=True
         except:
             pass
-            
+
 class OtherFunctions:
 
     oldGardensInit=DGPlayground.DGPlayground.__init__
@@ -352,44 +347,44 @@ class OtherFunctions:
             for battle in base.cr.doFindAll('battle'):
                 if vpMaxer.factoryAutoer.roomNum==len(vpMaxer.factoryAutoer.roomsNeeded):
                     if len(battle.suits)>1:
-                        for suit in battle.suits: 
+                        for suit in battle.suits:
                             if suit.getName()!='Skelecog':
                                 attackSuit=suit
                     else:
                         attackSuit=battle.suits[0]
                 else:
                     attackSuit=battle.suits[0]
-                    
+
                 if vpMaxer.restock.noToonUp and not vpMaxer.restock.noLure:
                     if vpMaxer.restock.firstTrack==2 and base.localAvatar.getHp()>(base.localAvatar.getMaxHp()*0.75):
                         battle.sendUpdate('requestAttack', [vpMaxer.restock.firstTrack, vpMaxer.restock.desiredLevel1, attackSuit.doId])
                     if base.localAvatar.getHp()>(base.localAvatar.getMaxHp()*0.75):
                         battle.sendUpdate('requestAttack', [vpMaxer.restock.thirdTrack, vpMaxer.restock.desiredLevel3, attackSuit.doId])
-                        
+
                 elif vpMaxer.restock.noLure:
                     if vpMaxer.restock.secondTrack==0 and base.localAvatar.getHp()<(base.localAvatar.getMaxHp()*0.75):
                         battle.sendUpdate('requestAttack', [vpMaxer.restock.secondTrack, vpMaxer.restock.desiredLevel2, base.localAvatar.doId])
                     if base.localAvatar.getHp()>(base.localAvatar.getMaxHp()*0.75):
                         battle.sendUpdate('requestAttack', [vpMaxer.restock.thirdTrack, vpMaxer.restock.desiredLevel3, attackSuit.doId])
-                        
+
                 else:
                     if base.localAvatar.inventory.inventory[vpMaxer.restock.firstTrack][vpMaxer.restock.desiredLevel1]>0:
                         battle.sendUpdate('requestAttack', [vpMaxer.restock.firstTrack, vpMaxer.restock.desiredLevel1, attackSuit.doId])
                     else:
                         break
-                        
+
                     if base.localAvatar.getHp()<(base.localAvatar.getMaxHp()*0.5):
-                    
+
                         if base.localAvatar.inventory.inventory[vpMaxer.restock.secondTrack][vpMaxer.restock.desiredLevel2]>0:
                             battle.sendUpdate('requestAttack', [vpMaxer.restock.secondTrack, vpMaxer.restock.desiredLevel2, base.localAvatar.doId])
                         else:
                             break
-                            
+
                         if base.localAvatar.inventory.inventory[vpMaxer.restock.thirdTrack][vpMaxer.restock.desiredLevel3]>0:
                             battle.sendUpdate('requestAttack', [vpMaxer.restock.thirdTrack, vpMaxer.restock.desiredLevel3, attackSuit.doId])
                         else:
                             break
-                            
+
                     else:
                         if base.localAvatar.inventory.inventory[vpMaxer.restock.thirdTrack][vpMaxer.restock.desiredLevel3]>0:
                             battle.sendUpdate('requestAttack', [vpMaxer.restock.thirdTrack, vpMaxer.restock.desiredLevel3, attackSuit.doId])
@@ -397,14 +392,14 @@ class OtherFunctions:
                             break
         except:
             pass
-        
+
     def sendUpdateHook(self, newself, fieldName, args=[], sendToId=None):
         if fieldName=="requestAttack":
             self.oldSendUpdate(newself,"requestAttack", args, sendToId)
             self.oldSendUpdate(newself,"movieDone",[])
         else:
             self.oldSendUpdate(newself,fieldName, args, sendToId)
-        
+
     def newGardensInit(self,*args):
         self.oldGardensInit(*args)
         if self.shouldContinue:
@@ -412,17 +407,17 @@ class OtherFunctions:
             vpMaxer.factoryAutoer.attackSeq.finish()
             vpMaxer.restock.wasInBattle=False
             self.checkMerits()
-    
+
     def newSetAnimState(self,*args,**kwds):
         self.oldSetAnim(*args,**kwds)
         if self.canSetParentAgain and self.shouldContinue:
             base.localAvatar.d_setParent(1)
             self.canSetParentAgain=False
             Sequence(Wait(2),Func(self.doUnsetCanSetParentAgain)).start()
-    
+
     def doUnsetCanSetParentAgain(self):
         self.canSetParentAgain=True
-    
+
     def newEnterHealth(self,newSelf,hplevel):
         try:
             self.oldEnterHealth(newSelf,hplevel)
@@ -432,21 +427,21 @@ class OtherFunctions:
                 Sequence(Wait(2),Func(self.checkMerits)).start()
         except:
             pass
-            
+
     def newSellbotInit(self,*args):
         self.oldSellbotInit(*args)
         if self.shouldContinue:
             self.walk()
             base.localAvatar.setWantBattles(False)
             Sequence(Wait(2),Func(self.checkMerits)).start()
-    
+
     def newPostInvite(self,newSelf,leaderId,inviterId):
         print('test')
         if leaderId==base.localAvatar.doId:
             newSelf.sendUpdate('requestAcceptInvite',[inviterId,leaderId])
         else:
             self.oldPostInvite(newSelf,leaderId,inviterId)
-        
+
     def checkMerits(self):
         # TTI Brought in a promotion button?
         if hasattr(base.localAvatar, 'promotionStatus'):
@@ -456,7 +451,7 @@ class OtherFunctions:
                 vpMaxer.autoerGui.display.newLine('Promoting')
                 Sequence(Wait(1),Func(self.checkMerits)).start()
                 return
-            
+
         if self.onlyFactory:
             base.localAvatar.cogMerits[3]=-4000
         if self.shouldEnd:
@@ -469,6 +464,11 @@ class OtherFunctions:
                 if vpMaxer.jellybeanFarmer.shouldFarm():
                     vpMaxer.jellybeanFarmer.startFarming()
                     return
+                #Hop districts so despawned treasures reload.
+                if getattr(self,'wantDistrictHop',False):
+                    if self.hopToFreshDistrict():
+                        return
+                    self.wantDistrictHop=False
                 if self.getMeritsLeft()==0 and self.isSuitComplete() and not self.onlyFactory:
                     if base.cr.doFind('DistributedSellbotHQDoor') and base.localAvatar.getZoneId() == 11000:
                         vpMaxer.vpAutoer.start()
@@ -489,7 +489,6 @@ class OtherFunctions:
                         vpMaxer.autoerGui.display.newLine('Teleporting to Sellbot hq')
                         Sequence(Wait(2),Func(self.teleBack)).start()
             else:
-                #vpMaxer.restock.noToons.finish()
                 try:
                     base.cr.removeInterest(vpMaxer.restock.interest1)
                     base.cr.removeInterest(vpMaxer.restock.interest2)
@@ -505,10 +504,10 @@ class OtherFunctions:
             else:
                 vpMaxer.autoerGui.display.newLine('Out of jellybeans')
                 base.localAvatar.setSystemMessage(0,'You have run out of jelly beans, please use the fishing code to gain some')
-    
+
     def getMeritsLeft(self):
         return CogDisguiseGlobals.getTotalMerits(base.localAvatar,3)-base.localAvatar.cogMerits[3]
-       
+
     def isSuitComplete(self):
         return base.localAvatar.cogParts[3] == CogDisguiseGlobals.PartsPerSuitBitmasks[3]
 
@@ -517,22 +516,22 @@ class OtherFunctions:
             base.cr.playGame.getPlace().fsm.forceTransition('walk')
         except:
             pass
-       
+
     def teleBack(self,zone=11000):
         try:
             self.walk()
             base.cr.playGame.getPlace().handleBookCloseTeleport(zone, zone)
         except:
             pass
-            
+
     def onlyDoFactory(self):
         self.onlyFactory=True
         base.localAvatar.setSystemMessage(0,'The VP Maxer will do only factory runs')
-        
+
     def doBoth(self):
         self.onlyFactory=False
         base.localAvatar.setSystemMessage(0,'The VP Maxer will do both factories and VPs')
-        
+
     def wantInvasions(self):
         self.useInvasions = True
         base.localAvatar.setSystemMessage(0,'Invasions will be used.')
@@ -541,7 +540,7 @@ class OtherFunctions:
     def noInvasions(self):
         self.useInvasions = False
         base.localAvatar.setSystemMessage(0,'Invasions will not be used.')
-        
+
     def haveJb(self):
         if base.localAvatar.cogLevels[0]==49:
             return True
@@ -549,12 +548,50 @@ class OtherFunctions:
             return False
         else:
             return True
-        
+
+    def useResistanceUnite(self,menuType):
+        #Use one owned unite of menuType on ourselves.
+        try:
+            from toontown.chat import ResistanceChat
+            msgs=base.localAvatar.resistanceMessages
+        except:
+            return False
+        for pair in msgs:
+            try:
+                textId,charges=pair[0],pair[1]
+                matches=charges>0 and ResistanceChat.decodeId(textId)[0]==menuType
+            except:
+                continue
+            if not matches:
+                continue
+            try:
+                base.localAvatar.sendUpdate('reqSCResistance',[textId,[base.localAvatar.doId]])
+                return True
+            except:
+                return False
+        return False
+
+    def useToonupUnite(self):
+        #Heal off a Toon-up unite.
+        try:
+            from toontown.chat import ResistanceChat
+        except:
+            return False
+        return self.useResistanceUnite(ResistanceChat.RESISTANCE_TOONUP)
+
+    def useMoneyUnite(self):
+        #Jellybeans off a Money unite.
+        try:
+            from toontown.chat import ResistanceChat
+        except:
+            return False
+        return self.useResistanceUnite(ResistanceChat.RESISTANCE_MONEY)
+
     def setStop(self):
         self.shouldEnd=True
         base.localAvatar.setSystemMessage(1,"The Autoer will stop at the end of this run")
         vpMaxer.autoerGui.stopTimer()
-    
+
     def start(self):
         DistributedObject.DistributedObject.sendUpdate=lambda newself, fieldName, args=[], sendToId=None: self.sendUpdateHook(newself, fieldName, args, sendToId)
         self.shouldEnd=False
@@ -569,11 +606,47 @@ class OtherFunctions:
             emptyShardList=[650000000, 754000000, 608000000, 756000000, 658000000, 712000000, 360000000, 410000000, 620000000, 454000000, 726000000, 362000000, 688000000, 316000000]
         if base.localAvatar.defaultShard not in emptyShardList:
             vpMaxer.autoerGui.display.newLine('TPing to an empty district')
-            base.cr.playGame.getPlace().requestTeleport(11000,11000,random.choice(emptyShardList),None)            
+            base.cr.playGame.getPlace().requestTeleport(11000,11000,random.choice(emptyShardList),None)
         else:
             self.checkMerits()
-        #vpMaxer.restock.noToons.loop()
-        
+        #Arm a 15-min district hop; applied between runs, never mid-run.
+        self.wantDistrictHop=False
+        self.districtHopToken=getattr(self,'districtHopToken',0)+1
+        self.scheduleDistrictHop(self.districtHopToken)
+
+    def scheduleDistrictHop(self,token):
+        Sequence(Wait(900),Func(self.fireDistrictHop,token)).start()
+
+    def fireDistrictHop(self,token):
+        #Only the newest timer keeps looping.
+        if token!=getattr(self,'districtHopToken',0) or not self.shouldContinue:
+            return
+        self.wantDistrictHop=True
+        self.scheduleDistrictHop(token)
+
+    def hopToFreshDistrict(self):
+        #Hop to an empty Sellbot HQ district. True if a hop started.
+        self.wantDistrictHop=False
+        cur=base.localAvatar.defaultShard
+        empties=[]
+        try:
+            for shard in base.cr.activeDistrictMap:
+                if shard==cur:
+                    continue
+                if base.cr.activeDistrictMap[shard].avatarCount<30:
+                    empties.append(shard)
+        except:
+            pass
+        if empties==[]:
+            return False
+        vpMaxer.autoerGui.display.newLine('Refreshing district (15 min)')
+        self.walk()
+        try:
+            base.cr.playGame.getPlace().requestTeleport(11000,11000,random.choice(empties),None)
+            return True
+        except:
+            return False
+
     def revertFunctions(self):
         LocalToon.LocalToon.setAnimState=self.oldSetAnim
         DGPlayground.DGPlayground.__init__=self.oldGardensInit
@@ -593,11 +666,11 @@ class VpAutoer:
     oldBossEnterIntro=DistributedSellbotBoss.DistributedSellbotBoss.enterIntroduction
     oldAvatarExit=DistributedCogHQDoor.DistributedCogHQDoor.avatarExit
     oldEnterWalk=CogHQLobby.CogHQLobby.enterWalk
-    
+
     def __init__(self):
         self.filter=False
         self.cardsWanted=['Flippy','Barnacle Bessie','Lil Oldman','Professor Pete','Stinky Ned','Daffy Don','Moe Zart','Sid Sonata','Franz Neckvein']
-        
+
         DistributedSellbotBoss.DistributedSellbotBoss.enterElevator=lambda newSelf: self.newBossEnterElevator(newSelf)
         DistributedSellbotBoss.DistributedSellbotBoss.enterIntroduction=lambda newSelf,*args: self.newBossEnterIntro(newSelf,*args)
         DistributedSellbotBoss.DistributedSellbotBoss.enterRollToBattleTwo=lambda newSelf: self.newEnterRollToBattleTwo(newSelf)
@@ -608,13 +681,13 @@ class VpAutoer:
         DistributedSellbotBoss.DistributedSellbotBoss.enterPrepareBattleThree=lambda newSelf: self.newEnterPrepareBattleThree(newSelf)
         DistributedSellbotBoss.DistributedSellbotBoss.enterPrepareBattleTwo=lambda newSelf: self.newEnterPrepareBattleTwo(newSelf)
         DistributedSellbotBoss.DistributedSellbotBoss.enterEpilogue=lambda newSelf: self.newEnterEpilogue(newSelf)
-        
+
     def newBossEnterElevator(self,newSelf):
         self.oldBossEnterElevator(newSelf)
         if vpMaxer.otherFunctions.shouldContinue:
             vpMaxer.autoerGui.display.newLine('Skipping Elevator')
             newSelf._DistributedBossCog__doneElevator()
-            
+
     def newBossEnterIntro(self,newSelf,*args):
         self.oldBossEnterIntro(newSelf,*args)
         if vpMaxer.otherFunctions.shouldContinue:
@@ -625,51 +698,51 @@ class VpAutoer:
                 vpMaxer.autoerGui.display.newLine('Card not in wanted cards')
                 vpMaxer.autoerGui.display.newLine('Restarting the VP')
                 Sequence(Wait(2),Func(vpMaxer.otherFunctions.teleBack)).start()
-    
+
     def newEnterEpilogue(self,newSelf):
         self.oldEnterEpilogue(newSelf)
         if vpMaxer.otherFunctions.shouldContinue:
             vpMaxer.otherFunctions.bossCount+=1
             vpMaxer.otherFunctions.teleBack()
             vpMaxer.autoerGui.display.newLine('Finished VP')
-    
+
     def newEnterRollToBattleTwo(self,newSelf):
         self.oldEnterRollToBattleTwo(newSelf)
         if vpMaxer.otherFunctions.shouldContinue:
             newSelf.exitRollToBattleTwo()
             vpMaxer.autoerGui.display.newLine('Skipping cutscene')
-    
+
     def newEnterPrepareBattleTwo(self,newSelf):
         self.oldEnterPrepareBattleTwo(newSelf)
         if vpMaxer.otherFunctions.shouldContinue:
             newSelf._DistributedSellbotBoss__onToBattleTwo(33)
             vpMaxer.autoerGui.display.newLine('Skipping dialogue 1')
-    
+
     def newEnterPrepareBattleThree(self,newSelf):
         self.oldEnterPrepareBattleThree(newSelf)
         if vpMaxer.otherFunctions.shouldContinue:
             newSelf._DistributedSellbotBoss__onToBattleThree(33)
             vpMaxer.autoerGui.display.newLine('Skipping dialogue 2')
-    
+
     def newEnterBattleThree(self,newSelf):
         self.oldEnterBattleThree(newSelf)
         if vpMaxer.otherFunctions.shouldContinue:
             self.endBattle()
             vpMaxer.autoerGui.display.newLine('Completing pie round')
-    
+
     def newEnterWaitForInput(self,*args):
         self.oldEnterWaitForInput(*args)
         if vpMaxer.otherFunctions.shouldContinue:
             Sequence(Wait(1), Func(self.exploit)).start()
             vpMaxer.autoerGui.display.newLine('Skipping Battle')
-    
+
     def newEnterWalk(self,newSelf,*args,**kwds):
         self.oldEnterWalk(newSelf,*args,**kwds)
         if len(args)>0:
             if vpMaxer.otherFunctions.shouldContinue and args[0]:
                 self.goVpBattle()
-            
-        
+
+
     def newAvatarExit(self,newSelf,id):
         self.oldAvatarExit(newSelf,id)
         if base.cr.doFind('Elevator') and id==base.localAvatar.doId and vpMaxer.otherFunctions.shouldContinue:
@@ -682,28 +755,28 @@ class VpAutoer:
         base.cr.doFind('Boarding').sendUpdate('requestLeave',[base.localAvatar.doId])
         base.cr.doFind('Boarding').sendUpdate('requestInvite',[base.localAvatar.doId])
         base.cr.doFind('Boarding').sendUpdate('requestGoToSecondTime',[base.cr.doFind('Elevator').doId])
-            
+
     def destroyBattle(self):
         base.cr.doFind('SafeZone').sendUpdate('enterSafeZone')
-    
+
     def filterOn(self):
         self.filter=True
         self.cardsWanted=['Flippy','Barnacle Bessie','Lil Oldman','Professor Pete','Stinky Ned','Daffy Don','Moe Zart','Sid Sonata','Franz Neckvein']
         base.localAvatar.setSystemMessage(0,'The VP Maxer will filter bad cards')
-    
+
     def filterOn16(self):
         self.filter=True
         self.cardsWanted=['Flippy', 'Daffy Don', 'Clerk Clara', 'Clerk Penny', 'Lil Oldman', 'Stinky Ned', 'Moe Zart', 'Sid Sonata', 'Barnacle Bessie',\
                           'Franz Neckvein', 'Madam Chuckle', 'Clerk Will', 'Nancy Gas', 'Mr. Freeze', 'Professor Pete', 'Soggy Nell']
         base.localAvatar.setSystemMessage(0,'The VP Maxer will filter for 16 cards')
-    
+
     def filterOff(self):
         self.filter=False
         base.localAvatar.setSystemMessage(0,'The VP Maxer will not filter bad cards')
 
     def exploit(self):
         Sequence(Func(self.destroyBattle), Wait(.5), Func(vpMaxer.otherFunctions.walk)).start()
-        
+
     def endBattle(self):
         if base.cr.doFind('V. P'):
             base.cr.doFind('V. P').sendUpdate('hitBossInsides')
@@ -721,13 +794,13 @@ class VpAutoer:
             vpMaxer.autoerGui.display.newLine('Starting Vice President')
             vpMaxer.autoerGui.display.newLine('Teleporting to lobby')
             base.cr.playGame.getPlace().requestTeleport(11000,11100,None,None)
-            
+
     def cardFilter(self):
         if base.cr.doFind('V. P').cagedToon.getName() in self.cardsWanted or not self.filter:
             return True
         else:
             return False
-    
+
     def revertFunctions(self):
         DistributedSellbotBoss.DistributedSellbotBoss.enterElevator=self.oldBossEnterElevator
         DistributedSellbotBoss.DistributedSellbotBoss.enterBattleThree=self.oldEnterBattleThree
@@ -739,14 +812,14 @@ class VpAutoer:
         DistributedSellbotBoss.DistributedSellbotBoss.enterIntroduction=self.oldBossEnterIntro
         DistributedCogHQDoor.DistributedCogHQDoor.avatarExit=self.oldAvatarExit
         CogHQLobby.CogHQLobby.enterWalk=self.oldEnterWalk
-            
+
 class FactoryAutoer:
     oldFactoryInit=FactoryExterior.FactoryExterior.__init__
     oldDistributedFactoryInit=DistributedFactory.DistributedFactory.__init__
     oldEnterReward=DistributedBattleFactory.DistributedBattleFactory.enterReward
     oldExitReward=DistributedBattleFactory.DistributedBattleFactory.exitReward
     oldEnterFactoryReward=DistributedBattleFactory.DistributedBattleFactory.enterFactoryReward
-    
+
     def __init__(self,vpMaxer):
         self.roomNum=0
         self.zones=[4,7,8,13,22,24,34,32]
@@ -754,26 +827,24 @@ class FactoryAutoer:
         self.gainLaffSeq=Sequence(Func(vpMaxer.restock.gainLaff),Wait(3.0))
         self.attackSeq=Sequence(Func(vpMaxer.restock.restock),Wait(1.0),Func(vpMaxer.otherFunctions.attack),Wait(1.0))
         self.factoryWillGivePromotion = False
-        
+
         FactoryExterior.FactoryExterior.__init__=lambda *args: self.newFactoryInit(*args)
         DistributedFactory.DistributedFactory.__init__=lambda *args: self.newDistributedFactoryInit(*args)
         DistributedBattleFactory.DistributedBattleFactory.enterReward=lambda newSelf,*args:self.newEnterReward(newSelf,*args)
-        #DistributedBattleFactory.DistributedBattleFactory.exitReward=lambda newSelf,*args, **kwds:self.newExitReward(newSelf,*args,**kwds)
         base.cr.doFind('SafeZone').d_enterSafeZone=lambda *args: self.newSafeZone(*args)
         base.localAvatar.died=lambda *args: self.newSafeZone(*args)
         DistributedBattleFactory.DistributedBattleFactory.d_toonDied=lambda *args: self.newSafeZone(*args)
         DistributedBattleFactory.DistributedBattleFactory.enterFactoryReward=lambda newSelf,*args:self.newEnterFactoryReward(newSelf,*args)
-                
+
     def enterBattle(self):
         if vpMaxer.otherFunctions.useInvasions and not self.factoryWillGivePromotion and self.roomNum == len(self.roomsNeeded):
-            #Time to summon an invasion!
             for potentialSuit in SuitDNA.suitHeadTypes:
                 suitIndex = SuitDNA.suitHeadTypes.index(potentialSuit)
                 if base.localAvatar.hasCogSummons(suitIndex, 'invasion'):
                     base.localAvatar.d_reqCogSummons('invasion', suitIndex)
-                    #We don't *actually* care about the response here. If it failed, that means there's already an invasion running, so it's whatever.
+                    #Ignore the response - failure just means one's running.
                     break
-                
+
         if base.localAvatar.getHp()>0:
             if base.cr.doFindAll('battle')==[]:
                 battles = []
@@ -801,7 +872,7 @@ class FactoryAutoer:
                 return False
         else:
             return False
-    
+
     def newExitReward(self, newself, *args, **kwds):
         returnValue = self.oldExitReward(newSelf, *args,**kwds)
         '''
@@ -812,16 +883,16 @@ class FactoryAutoer:
             vpMaxer.autoerGui.display.newLine('Error in completing factory')
             vpMaxer.autoerGui.display.newLine('No merits Recieved')
             Sequence(Wait(1),Func(vpMaxer.otherFunctions.walk),Func(vpMaxer.otherFunctions.teleBack)).start()
-            
+
         else:
             #vpMaxer.otherFunctions.walk()
             Sequence(Wait(1), Func(self.newBattle)).start()
             pass
             ''',
         return returnValue
-    
+
     def newEnterReward(self,newSelf,*args):
-        
+
         if vpMaxer.otherFunctions.shouldContinue:
             newSelf._DistributedLevelBattle__handleFloorRewardDone()
             newSelf.d_rewardDone(base.localAvatar.doId)
@@ -836,7 +907,7 @@ class FactoryAutoer:
                 Sequence(Wait(1),Func(vpMaxer.otherFunctions.walk),Func(vpMaxer.otherFunctions.teleBack)).start()
             else:
                 Sequence(Wait(5),Func(self.enterBattle)).start()
-    
+
     def newEnterFactoryReward(self,newSelf,*args):
         self.oldEnterFactoryReward(newSelf,*args)
         if vpMaxer.otherFunctions.shouldContinue:
@@ -846,12 +917,12 @@ class FactoryAutoer:
             self.generateAgain()
             vpMaxer.autoerGui.display.newLine('Completed Factory')
             Sequence(Wait(1),Func(vpMaxer.otherFunctions.walk),Func(vpMaxer.otherFunctions.teleBack)).start()
-                
+
     def newFactoryInit(self,*args):
         self.oldFactoryInit(*args)
         if vpMaxer.otherFunctions.shouldContinue:
             Sequence(Wait(2),Func(self.enterElevator)).start()
-        
+
     def newDistributedFactoryInit(self,*args):
         self.oldDistributedFactoryInit(*args)
         if vpMaxer.otherFunctions.shouldContinue:
@@ -862,7 +933,7 @@ class FactoryAutoer:
             self.workOutRoomsNeeded()
             vpMaxer.autoerGui.display.newLine('Entering Factory')
             Sequence(Wait(2),Func(self.warpToZone,self.roomsNeeded[self.roomNum])).start()
-    
+
     def workOutRoomsNeeded(self):
         self.roomsNeeded=[]
         self.factoryWillGivePromotion = False
@@ -876,7 +947,7 @@ class FactoryAutoer:
                 self.factoryWillGivePromotion = True
                 break
         self.roomsNeeded.append(self.zones[-1])
-            
+
     def warpToZone(self,zone):
         for factory in base.cr.doFindAll('Factory'):
             if hasattr(factory, 'warpToZone'):
@@ -885,32 +956,61 @@ class FactoryAutoer:
                 self.roomNum+=1
                 break
         Sequence(Wait(1),Func(self.enterBattle)).start()
-    
+
     def newSafeZone(self,*args):
         Sequence(Wait(1),Func(vpMaxer.otherFunctions.walk),Func(base.localAvatar.collisionsOff)).start()
         base.cr.doFind('SafeZone').sendUpdate('enterSafeZone')
         vpMaxer.restock.wasInBattle=True
         vpMaxer.autoerGui.display.newLine('Died, recovering')
-        
+        #Watchdog: unite-heal if treasure healing dead-ends, restart after 2 min.
+        self.recoverTries=0
+        Sequence(Wait(6),Func(self.recoverWatchdog)).start()
+
+    def recoverWatchdog(self):
+        #Recovered or bot stopped.
+        if not (vpMaxer.otherFunctions.shouldContinue and vpMaxer.restock.wasInBattle):
+            return
+        self.recoverTries+=1
+        #Still dead: unite-heal every couple cycles while we have unites.
+        if base.localAvatar.getHp()<=0 and self.recoverTries>=2 and self.recoverTries%2==0:
+            if vpMaxer.otherFunctions.useToonupUnite():
+                vpMaxer.autoerGui.display.newLine('Force healing with unite')
+        #Wait the full 2 min before giving up.
+        if self.recoverTries<20:
+            Sequence(Wait(6),Func(self.recoverWatchdog)).start()
+            return
+        #Dead end - reset and restart at Sellbot HQ.
+        vpMaxer.autoerGui.display.newLine('Recovery stuck, restarting run')
+        vpMaxer.restock.wasInBattle=False
+        self.attackSeq.finish()
+        self.gainLaffSeq.finish()
+        self.generateAgain()
+        try:
+            base.localAvatar.collisionsOn()
+        except:
+            pass
+        vpMaxer.otherFunctions.walk()
+        vpMaxer.otherFunctions.teleBack()
+
     def preTele(self):
         DistributedTrolley.DistributedTrolley.__init__ = newInit
         DistributedPartyGate.DistributedPartyGate.__init__ = newInit
         DistributedDoor.DistributedDoor.__init__ = newInit
         base.localAvatar.stopLookAroundNow()
-            
+
     def generateAgain(self):
         DistributedTrolley.DistributedTrolley.__init__ = oldTrolleyInit
         DistributedPartyGate.DistributedPartyGate.__init__ = oldPartyInit
         DistributedDoor.DistributedDoor.__init__ = oldDoorInit
         base.localAvatar.findSomethingToLookAt = vpMaxer.restock.oldFindSomethingToLookAt
         ToonHead.ToonHead._ToonHead__lookAround = vpMaxer.restock.oldLookAround
-             
+
     def goFactory(self):
         vpMaxer.otherFunctions.walk()
         base.localAvatar.setWantBattles(True)
         vpMaxer.autoerGui.display.newLine('Heading to the factory')
         base.localAvatar.setPos(167.151, -157.024, -0.64781)
-        
+
     def enterElevator(self):
         for elevator in base.cr.doFindAll("Elevator"):
             if elevator.getDestName()=='Front Entrance':
@@ -921,7 +1021,7 @@ class FactoryAutoer:
                 base.cr.doFind('Boarding').sendUpdate('requestInvite',[base.localAvatar.doId])
                 base.cr.doFind('Boarding').sendUpdate('requestGoToSecondTime',[elevator.doId])
                 return
-                
+
     def revertFunctions(self):
         FactoryExterior.FactoryExterior.__init__=self.oldFactoryInit
         DistributedFactory.DistributedFactory.__init__=self.oldDistributedFactoryInit
@@ -934,13 +1034,33 @@ class FactoryAutoer:
 
 class JellybeanFarmer:
     DREAMLAND_ZONE=9000
-    LOW_JELLYBEANS=500
+    LOW_JELLYBEANS=1000
     BANK_FULL=12000
 
     def __init__(self,maxer):
         self.maxer=maxer
         self.farming=False
         self._noToonsRunning=False
+
+    def inCurrentShard(self,do):
+        #Old-shard objects linger after a hop; a doId floors to its district id.
+        try:
+            return (do.doId-(do.doId%1000000))==base.localAvatar.defaultShard
+        except:
+            return False
+
+    def firstInShard(self,className):
+        for do in base.cr.doFindAll(className):
+            if self.inCurrentShard(do):
+                return do
+        return None
+
+    def spotsInShard(self):
+        spots=[]
+        for s in base.cr.doFindAll('DistributedFishingSpot'):
+            if self.inCurrentShard(s):
+                spots.append(s)
+        return spots
 
     def shouldFarm(self):
         try:
@@ -955,13 +1075,46 @@ class JellybeanFarmer:
             return
         self.farming=True
         self.maxer.autoerGui.display.newLine('Low on jellybeans')
-        self.maxer.autoerGui.display.newLine('Fishing at Dreamland')
         try:
             self._noToonsRunning=self.maxer.restock.noToons.isPlaying()
             if self._noToonsRunning:
                 self.maxer.restock.noToons.finish()
         except:
             self._noToonsRunning=False
+        #Beans from unites first; fish only if we have none.
+        if self.tryBeanUnite():
+            return
+        self.beginFishing()
+
+    def tryBeanUnite(self):
+        #Use one Money unite, then check the total after it lands. True if used.
+        if not self.farming:
+            return False
+        if self.maxer.otherFunctions.useMoneyUnite():
+            self.maxer.autoerGui.display.newLine('Using jellybean unite')
+            Sequence(Wait(1.5),Func(self.afterBeanUnite)).start()
+            return True
+        return False
+
+    def afterBeanUnite(self):
+        if not self.farming:
+            return
+        try:
+            total=base.localAvatar.getTotalMoney()
+        except:
+            total=0
+        self.maxer.autoerGui.display.newLine('Jellybeans: '+str(total))
+        if total>=self.BANK_FULL:
+            self.stopFarming()
+            return
+        #Still low: another unite, else fish.
+        if not self.tryBeanUnite():
+            self.beginFishing()
+
+    def beginFishing(self):
+        if not self.farming:
+            return
+        self.maxer.autoerGui.display.newLine('Fishing at Dreamland')
         self.maxer.otherFunctions.walk()
         Sequence(Wait(1),Func(self.goDreamland)).start()
 
@@ -976,7 +1129,18 @@ class JellybeanFarmer:
     def enterPond(self):
         if not self.farming:
             return
-        spots=base.cr.doFindAll('DistributedFishingSpot')
+        #No Fisherman means the NPCs unloaded - hop rather than fish a dead end.
+        if not self.firstInShard('Fisherman'):
+            self.noFisherTries=getattr(self,'noFisherTries',0)+1
+            if self.noFisherTries>=3:
+                self.noFisherTries=0
+                self.hopDistrict()
+            else:
+                Sequence(Wait(2),Func(self.enterPond)).start()
+            return
+        self.noFisherTries=0
+        #Stale spots never spawn fish.
+        spots=self.spotsInShard()
         if spots==[]:
             Sequence(Wait(2),Func(self.enterPond)).start()
             return
@@ -987,12 +1151,51 @@ class JellybeanFarmer:
         self.maxer.autoerGui.display.newLine('Fishing for jellybeans')
         Sequence(Wait(2),Func(self.catchFish)).start()
 
+    def hopDistrict(self):
+        #Hop districts to refresh the unloaded NPCs so the Fisherman reappears.
+        if not self.farming:
+            return
+        self.maxer.autoerGui.display.newLine('No fisherman here, switching district')
+        cur=base.localAvatar.defaultShard
+        others=[]
+        populated=[]
+        try:
+            for shard in base.cr.activeDistrictMap:
+                if shard==cur:
+                    continue
+                others.append(shard)
+                if base.cr.activeDistrictMap[shard].avatarCount>0:
+                    populated.append(shard)
+        except:
+            pass
+        if populated:
+            pool=populated
+        else:
+            pool=others
+        try:
+            self.maxer.otherFunctions.walk()
+        except:
+            pass
+        if pool:
+            try:
+                base.cr.playGame.getPlace().requestTeleport(self.DREAMLAND_ZONE,self.DREAMLAND_ZONE,random.choice(pool),None)
+            except:
+                pass
+        Sequence(Wait(5),Func(self.enterPond)).start()
+
     def catch(self):
         try:
             base.localAvatar.wakeUp()
-            fish=base.cr.doFindAll('FishingTarget')[0]
+            fish=None
+            for t in base.cr.doFindAll('FishingTarget'):
+                if self.inCurrentShard(t):
+                    fish=t
+                    break
+            if fish is None:
+                return
             for fp in base.cr.doFindAll('FishingPond'):
-                fp.d_hitTarget(fish)
+                if self.inCurrentShard(fp):
+                    fp.d_hitTarget(fish)
         except:
             pass
 
@@ -1010,13 +1213,15 @@ class JellybeanFarmer:
     def sell(self):
         if not self.farming:
             return
-        fisherman=base.cr.doFind('Fisherman')
-        if fisherman:
-            try:
-                fisherman.sendUpdate('avatarEnter')
-                fisherman.sendUpdate('completeSale',[1])
-            except:
-                pass
+        fisherman=self.firstInShard('Fisherman')
+        if not fisherman:
+            self.hopDistrict()
+            return
+        try:
+            fisherman.sendUpdate('avatarEnter')
+            fisherman.sendUpdate('completeSale',[1])
+        except:
+            pass
         Sequence(Wait(1),Func(self.afterSell)).start()
 
     def afterSell(self):
@@ -1047,7 +1252,28 @@ class JellybeanFarmer:
         except:
             pass
         self.maxer.otherFunctions.walk()
-        Sequence(Wait(1),Func(self.maxer.otherFunctions.teleBack)).start()
+        #Return to an empty district so runs stay solo.
+        Sequence(Wait(1),Func(self.returnToEmptyDistrict)).start()
+
+    def returnToEmptyDistrict(self):
+        empties=[]
+        try:
+            for shard in base.cr.activeDistrictMap:
+                if base.cr.activeDistrictMap[shard].avatarCount<30:
+                    empties.append(shard)
+        except:
+            pass
+        try:
+            self.maxer.otherFunctions.walk()
+        except:
+            pass
+        try:
+            if empties:
+                base.cr.playGame.getPlace().requestTeleport(11000,11000,random.choice(empties),None)
+            else:
+                self.maxer.otherFunctions.teleBack()
+        except:
+            self.maxer.otherFunctions.teleBack()
 
 class VPMaxer:
     def __init__(self):
@@ -1061,8 +1287,12 @@ class VPMaxer:
                                 'str(vpMaxer.otherFunctions.numberToSuit[base.localAvatar.cogTypes[3]])+" lvl "+str(base.localAvatar.cogLevels[3]+1)','str(vpMaxer.otherFunctions.getMeritsLeft())'],\
                                 'VP MXR','sell')
         self.jellybeanFarmer=JellybeanFarmer(self)
-        
+
     def revert(self):
+        #Stop pending fishing steps before destroy(), or they hit the dead GUI.
+        self.jellybeanFarmer.farming=False
+        #Stop the district-hop timer so it can't fire after GUI teardown.
+        self.otherFunctions.districtHopToken=getattr(self.otherFunctions,'districtHopToken',0)+1
         self.restock.revertFunctions()
         self.factoryAutoer.revertFunctions()
         self.vpAutoer.revertFunctions()

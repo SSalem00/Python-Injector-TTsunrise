@@ -1,0 +1,7 @@
+# Teleport to Donald's Dreamland (DDL = 9000)
+try:
+    place = base.cr.playGame.getPlace()
+    place.fsm.forceTransition('walk')
+    place.handleBookCloseTeleport(9000, 9000)
+except Exception, e:
+    base.localAvatar.setSystemMessage(0, 'DDL TP failed: %s' % e)

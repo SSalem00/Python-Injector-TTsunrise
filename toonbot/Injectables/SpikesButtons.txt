@@ -1,0 +1,475 @@
+base.localAvatar.showHpString('\x01candidate_inactive\x01Salem', duration=2, scale=0.5)
+from direct.gui.DirectGui import DirectButton
+def ServerGrabLaff():
+   base.cr.doFindAll("Treasure")[0].d_requestGrab()
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Grab Laff', duration=2, scale=0.5)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn1 = DirectButton(frameSize=None, text='Server Grab Laff', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=ServerGrabLaff, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.85,-0,-.93), text_scale=0.059999999999999998, borderWidth=(0.015, 0.01), scale=.7)
+def LoseLaff():
+   base.localAvatar.d_squish(3)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn2 = DirectButton(frameSize=None, text='Server Lose Laff', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=LoseLaff, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.55,-0,-.93), text_scale=0.059999999999999998, borderWidth=(0.015, 0.01), scale=.7)
+def UNITE():
+   base.talkAssistant.sendOpenTalk('WE ARE TEAM LEGEND! '* 20)
+   base.localAvatar.b_setEmoteState(22,1)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn3 = DirectButton(frameSize=None, text='Team Legend', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=UNITE, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (1.1,-0,-0), text_scale=0.06, borderWidth=(0.013, 0.01), scale=.7)
+def Raid():
+    houseZoneGet = base.localAvatar.getZoneId()
+    houseZoneGet += 10
+    houseZoneGet = int(houseZoneGet)
+    base.cr.sendSetZoneMsg(houseZoneGet)
+    base.localAvatar.showHpString('\x01candidate_inactive\x01Raid House', duration=2, scale=0.5)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn4 = DirectButton(frameSize=None, text='Raid House', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=Raid, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (.05,-0,-.93), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def ID():
+    messenger.send('nameTagShowAvId')
+    base.localAvatar.showHpString('\x01candidate_inactive\x01Show ID', duration=2, scale=0.5)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn5 = DirectButton(frameSize=None, text='ID', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=ID, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.25,-0,-.85), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def broadcast(includingSelf=True):
+        startingToon = 0
+        toonOn = 0
+        listToonIds = base.localAvatar.getNearbyPlayers(1000000000000000, includingSelf)
+        endingToon = len(listToonIds)
+        print listToonIds
+        while startingToon != endingToon:
+            base.localAvatar.d_battleSOS(base.localAvatar.doId, listToonIds[toonOn])
+            print toonOn
+            toonOn = toonOn + 1
+            startingToon = startingToon + 1
+def HELP():
+    broadcast(True)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn6 = DirectButton(frameSize=None, text='Help', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=HELP, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (.05,-0,-.85), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def SKIP():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Skip Trolley', duration=2, scale=0.5)
+   messenger.send('minigameAbort')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnSkipTrolley = DirectButton(frameSize=None, text='Skip Trolley', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=SKIP, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.55,-0,-.85), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def SPLASH():
+   base.localAvatar.d_playSplashEffect(base.localAvatar.getX(), base.localAvatar.getY(), base.localAvatar.getZ())
+   base.localAvatar.playSplashEffect(base.localAvatar.getX(), base.localAvatar.getY(), base.localAvatar.getZ())
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnSplash = DirectButton(frameSize=None, text='Splash', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=SPLASH, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.85,-0,-.85), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def WHISPER():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Whispering', duration=2, scale=0.5)
+   def broadcastWhisper(message="", includingSelf=True):
+    nearbyToonIds = base.localAvatar.getNearbyPlayers(pow(10, 10), includingSelf)
+    for nearbyToonIds in nearbyToonIds:base.talkAssistant.sendWhisperTalk(str(message), nearbyToonIds)
+   broadcastWhisper('WE ARE TEAM LEGEND! '* 20, True)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn7 = DirectButton(frameSize=None, text='Whisper', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=WHISPER, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.85,-0,-.77), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def GLOBAL():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Global Teleport', duration=2, scale=0.5)
+   import toontown
+   base.localAvatar.setTeleportAccess(toontown.toonbase.ToontownGlobals.HoodsForTeleportAll)
+   base.localAvatar.setHoodsVisited(toontown.toonbase.ToontownGlobals.HoodsForTeleportAll)
+   base.localAvatar.book.pages[1].shardChoiceReject = base.localAvatar.book.pages[1].choseShard
+   base.localAvatar.book.pages[1].showPop = 1
+   base.localAvatar.setSystemMessage(0, 'Global Teleport Activated')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn8 = DirectButton(frameSize=None, text='Global TP', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=GLOBAL, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.55,-0,-.77), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def STEALTHON():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Stealth On', duration=2, scale=0.5)
+   word = base.localAvatar.getZoneId()
+   word += 10
+   base.localAvatar.b_setLocation(base.localAvatar.defaultShard, word)
+   base.localAvatar.setSystemMessage(1, 'Stealth On')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn9 = DirectButton(frameSize=None, text='Stealth On', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=STEALTHON, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.65,-0,.95), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def STEALTHOFF():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Stealth Off', duration=2, scale=0.5)
+   word = base.localAvatar.getZoneId()
+   word -= 10
+   base.localAvatar.b_setLocation(base.localAvatar.defaultShard, word)
+   base.localAvatar.setSystemMessage(1, 'Stealth Off')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn10 = DirectButton(frameSize=None, text='Stealth Off', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=STEALTHOFF, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.65,-0,.88), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def COLLISIONSON():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Collisions On', duration=2, scale=0.5)
+   base.localAvatar.collisionsOn()
+   base.localAvatar.setSystemMessage(1, 'Collisions On')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn11 = DirectButton(frameSize=None, text='Collisions On', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=COLLISIONSON, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.35,-0,.95), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def COLLISIONSOFF():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Collisions Off', duration=2, scale=0.5)
+   base.localAvatar.collisionsOff()
+   base.localAvatar.setSystemMessage(1, 'Collisions Off')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn12 = DirectButton(frameSize=None, text='Collisions Off', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=COLLISIONSOFF, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.35,-0,.88), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def STEAL():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Stealing Clothes', duration=2, scale=0.5)
+   closetn = base.cr.doFindAll("closet")
+   for closetn in base.cr.doFindAll("closet"):
+    messenger.send("purchaseDone-" + str(closetn.doId))
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn13 = DirectButton(frameSize=None, text='Steal Clothes', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=STEAL, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.25,-0,-.77), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def blackToon():
+   base.localAvatar.find('**/ears-short').setColor(0.25,0.25,0.3)
+   base.localAvatar.find('**/head-short').setColor(0.25,0.25,0.3)
+   base.localAvatar.find('**/head-front-short').setColor(0.25,0.25,0.3)
+   base.localAvatar.find('**/neck').removeNode()
+   base.localAvatar.find('**/neck').setColor(0.25,0.25,0.3)
+   base.localAvatar.find('**/arms').removeNode()
+   base.localAvatar.find('**/arms').removeNode()
+   base.localAvatar.find('**/arms').setColor(0.25,0.25,0.3)
+   base.localAvatar.find('**/legs').removeNode()
+   base.localAvatar.find('**/legs').removeNode()
+   base.localAvatar.find('**/legs').setColor(0.25,0.25,0.3)
+   base.localAvatar.find('**/feet').removeNode()
+   base.localAvatar.find('**/feet').removeNode()
+   base.localAvatar.find('**/feet').setColor(0.25,0.25,0.3)
+def CLOTHES1():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Team Legend Uniform', duration=2, scale=0.5)
+   base.localAvatar.setDNAString('t\x05\x01\x01\x01\x76\x03\x69\x03\55\x03\x19\x00\x19\x0f')
+   blackToon()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn15 = DirectButton(frameSize=None, text='Uniform', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=CLOTHES1, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,.10), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def CLOTHES2():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Team Legend Uniform', duration=2, scale=0.5)
+   base.localAvatar.setDNAString('t\x05\x01\x01\x01\x56\x0d\x4b\x0d\62\x0d\x19\x00\x19\x0f')
+   blackToon()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn16 = DirectButton(frameSize=None, text='Uniform', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=CLOTHES2, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,.03), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def CLOTHES3():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Resistance Ranger/Toontrooper', duration=2, scale=0.5)
+   base.localAvatar.setDNAString('t\x05\x01\x01\x01\157\x1b\142\x1b\x29\x1b\x19\x00\x19\x0f')
+   blackToon()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn17 = DirectButton(frameSize=None, text='Leader', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=CLOTHES3, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.04), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def CLOTHES4():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Pirate', duration=2, scale=0.5)
+   base.localAvatar.setDNAString('t\x05\x01\x01\x00\x7b\x1b\x0b\x1b\x30\x1b\x19\x00\x19\x0f')
+   blackToon()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn18 = DirectButton(frameSize=None, text='Pirate', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=CLOTHES4, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.11), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def CLOTHES5():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Toonisaur', duration=2, scale=0.5)
+   base.localAvatar.setDNAString('t\x05\x05\x01\x01\x7e\x1b\x71\x1b\x33\x1b\x19\x00\x19\x0f')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn19 = DirectButton(frameSize=None, text='Toonisaur', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=CLOTHES5, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.18), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def POND():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Taking Over Pond', duration=2, scale=0.5)
+   base.cr.doFindAll("DistributedFishingSpot")[0].sendUpdate("requestEnter", [])
+   base.cr.doFindAll("DistributedFishingSpot")[1].sendUpdate("requestEnter", [])
+   base.cr.doFindAll("DistributedFishingSpot")[2].sendUpdate("requestEnter", [])
+   base.cr.doFindAll("DistributedFishingSpot")[3].sendUpdate("requestEnter", [])
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnPond = DirectButton(frameSize=None, text='Take Over Pond', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=POND, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.25), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def HQ():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Taking Over HQ', duration=2, scale=0.5)
+   base.cr.doFindAll("HQ Officer")[0].sendUpdate("avatarEnter", [])
+   base.cr.doFindAll("HQ Officer")[1].sendUpdate("avatarEnter", [])
+   base.cr.doFindAll("HQ Officer")[2].sendUpdate("avatarEnter", [])
+   base.cr.doFindAll("HQ Officer")[3].sendUpdate("avatarEnter", [])
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn20 = DirectButton(frameSize=None, text='Take Over HQ', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=HQ, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.32), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def FASTON():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Fast On', duration=2, scale=0.5)
+   base.localAvatar.physControls.avatarControlReverseSpeed=60
+   base.localAvatar.physControls.avatarControlRotateSpeed=170
+   base.localAvatar.physControls.avatarControlJumpForce = 50
+   base.localAvatar.physControls.setGravity(35)
+   base.localAvatar.physControls.avatarControlForwardSpeed = 80
+   base.localAvatar.setSystemMessage(1, 'Fast On')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn21 = DirectButton(frameSize=None, text='Fast On', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=FASTON, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.05,-0,.95), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def FASTOFF():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Fast Off', duration=2, scale=0.5)
+   base.localAvatar.physControls.avatarControlReverseSpeed=10
+   base.localAvatar.physControls.avatarControlRotateSpeed=80
+   base.localAvatar.physControls.avatarControlJumpForce = 25
+   base.localAvatar.physControls.setGravity(50)
+   base.localAvatar.physControls.avatarControlForwardSpeed = 20
+   base.localAvatar.setSystemMessage(1, 'Fast Off')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn22 = DirectButton(frameSize=None, text='Fast Off', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=FASTOFF, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.05,-0,.88), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def DANCE():
+   base.localAvatar.b_setAnimState("victory", 10)
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Dancing', duration=2, scale=0.5)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn23 = DirectButton(frameSize=None, text='Fast Dance', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=DANCE, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (.35,-0,-.93), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def BANK():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01 +5 Jellybeans Transfered', duration=2, scale=0.5)
+   base.cr.doFindAll("DistributedBank")[0].sendUpdate("transferMoney", [5])
+   base.localAvatar.setSystemMessage(1, '5 Jellybean Transfered')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn24 = DirectButton(frameSize=None, text='JB Transfer', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=BANK, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.39), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def MEMBER():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Membership', duration=2, scale=0.5)
+   import otp, toontown
+   def returnGameAccess(*args):
+       return 2
+   base.cr._OTPClientRepository__isPaid = True
+   otp.otpbase.OTPGlobals.AccessVelvetRope = True
+   otp.otpbase.OTPGlobals.AccessFull = 2
+   otp.otpbase.OTPGlobals.createFriendsWithChat = True
+   toontown.toon.LocalToon.LocalToon.gameAccess = 2
+   base.launcher.setValue(base.launcher.PaidUserLoggedInKey, '1')
+   toontown.toon.LocalToon.LocalToon.getGameAccess = returnGameAccess
+   def returnAllowedSecretChat(*args, **kwds):return True
+   base.cr.allowSecretChat = returnAllowedSecretChat
+   base.cr.isParentPasswordSet = returnAllowedSecretChat
+   base.localAvatar.setEmoteAccess([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
+   base.localAvatar.setSystemMessage(1, 'Membership Activated')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn25 = DirectButton(frameSize=None, text='Membeship', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=MEMBER, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (.05,-0,-.77), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def RIVER():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Heading to River', duration=2, scale=0.5)
+   base.localAvatar.book.pages[1].choseShard(414000000)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn26 = DirectButton(frameSize=None, text='River TP', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=RIVER, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.46), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def ESCAPE():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Quick Escape', duration=2, scale=0.5)
+   messenger.send('clearOutToonInterior')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn27 = DirectButton(frameSize=None, text='Quick Escape', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=ESCAPE, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (.35,-0,-.85), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def FISH():
+   fishTargets = base.cr.doFindAll("FishingTarget")
+   fishPonds = base.cr.doFindAll("FishingPond")
+   fishermen = base.cr.doFindAll("Fisherman")
+   if not fishTargets or not fishPonds or not fishermen:
+      base.localAvatar.showHpString('\x01candidate_inactive\x01No fishing area nearby', duration=2, scale=0.5)
+      return
+   startingFish = 0; endingFish = 24
+   while startingFish != endingFish:
+       fishPonds[0].d_hitTarget(fishTargets[0])
+       startingFish += 1
+   messenger.send('enterNPCToon-' + str(fishermen[0].doId), [1])
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn28 = DirectButton(frameSize=None, text='Auto Fish', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=FISH, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.53), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def UNITE2():
+   base.talkAssistant.sendOpenTalk('                                                                                                                                                                         TEAM LEGEND IS AWESOME       TEAM LEGEND IS AWESOME       TEAM LEGEND IS AWESOME        TEAM LEGEND IS AWESOME       TEAM LEGEND IS AWESOME       TEAM LEGEND IS AWESOME       TEAM LEGEND IS AWESOME       TEAM LEGEND IS AWESOME\n' * 1)
+   base.localAvatar.b_setEmoteState(23,1)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn29 = DirectButton(frameSize=None, text='Team Legend', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=UNITE2, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (1.1,-0,-.07), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+from direct.interval.IntervalGlobal import *
+def Purple():
+ base.localAvatar.b_setSC(2000)
+def Blue():
+ base.localAvatar.b_setSC(2001)
+def Cyan():
+ base.localAvatar.b_setSC(2002)
+def Teal():
+ base.localAvatar.b_setSC(2003)
+def Green():
+ base.localAvatar.b_setSC(2004)
+def Yellow():
+ base.localAvatar.b_setSC(2005)
+def Orange():
+ base.localAvatar.b_setSC(2006)
+def Red():
+ base.localAvatar.b_setSC(2007)
+def Pink():
+ base.localAvatar.b_setSC(2008)
+def Brown():
+ base.localAvatar.b_setSC(2009)
+def Colours():
+  seq = Sequence()
+  seq.append(Func(Purple))
+  seq.append(Wait(1))
+  seq.append(Func(Blue))
+  seq.append(Wait(1))
+  seq.append(Func(Cyan))
+  seq.append(Wait(1))
+  seq.append(Func(Teal))
+  seq.append(Wait(1))
+  seq.append(Func(Green))
+  seq.append(Wait(1))
+  seq.append(Func(Yellow))
+  seq.append(Wait(1))
+  seq.append(Func(Orange))
+  seq.append(Wait(1))
+  seq.append(Func(Red))
+  seq.append(Wait(1))
+  seq.append(Func(Pink))
+  seq.append(Wait(1))
+  seq.append(Func(Brown))
+  seq.start()
+def COLOR():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Color Bot', duration=2, scale=0.5)
+   Colours()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn30 = DirectButton(frameSize=None, text='Color Bot', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=COLOR, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (0.35,-0,-.77), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def RAID():
+   base.localAvatar.b_setSC(20136)
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnRaid = DirectButton(frameSize=None, text='RAID!', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=RAID, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-.25,-0,-.93), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+from direct.interval.IntervalGlobal import *
+def TALK1():
+    base.talkAssistant.sendOpenTalk('We are Team Legend.')
+def TALK2():
+    base.talkAssistant.sendOpenTalk('We are Legion.')
+def TALK3():
+    base.talkAssistant.sendOpenTalk('We do not forgive.')
+def TALK4():
+    base.talkAssistant.sendOpenTalk('We do not forget.')
+def TALK5():
+    base.talkAssistant.sendOpenTalk('Expect us.')
+def TepOUT():
+    base.localAvatar.b_setAnimState(('TeleportOut'))
+def TALKSEQ():
+  seq = Sequence()
+  seq.append(Func(TALK1))
+  seq.append(Wait(3))
+  seq.append(Func(TALK2))
+  seq.append(Wait(3))
+  seq.append(Func(TALK3))
+  seq.append(Wait(3))
+  seq.append(Func(TALK4))
+  seq.append(Wait(3))
+  seq.append(Func(TALK5))
+  seq.append(Func(TepOUT))
+  seq.start()
+def UNITE3():
+   TALKSEQ()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnTeamBot = DirectButton(frameSize=None, text='Team Bot', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=UNITE3, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (1.1,-0,-.14), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+def SKIPT():
+   messenger.send('rejectTutorial')
+   base.cr.gameFSM.request('closeShard')
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn32 = DirectButton(frameSize=None, text='Skip Tutorial', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=SKIPT, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.6), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)
+from direct.interval.IntervalGlobal import *
+def OFF():
+ word = base.localAvatar.getZoneId()
+ word -= 10
+ base.localAvatar.b_setLocation(base.localAvatar.defaultShard, word)
+def ON():
+ word = base.localAvatar.getZoneId()
+ word += 10
+ base.localAvatar.b_setLocation(base.localAvatar.defaultShard, word)
+def FINISH():
+ base.localAvatar.showHpString('\x01candidate_inactive\x01Disconnection Code Finished', duration=3, scale=0.7)
+def DC():
+  seq = Sequence()
+  seq.append(Func(ON))
+  seq.append(Wait(2))
+  seq.append(Func(OFF))
+  seq.append(Func(FINISH))
+  seq.start()
+from direct.gui.DirectGui import DirectButton
+def DISCONNECT():
+   DC()
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtn44 = DirectButton(frameSize=None, text='Party DC', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=DISCONNECT, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (0.85,-0,-0.8), text_scale=0.059, borderWidth=(0.13, 0.01), scale=1.1)
+currentAnim = 0
+animList = ['Squish','Push','victory','Flattened','dive','TeleportOut','TeleportIn','Sad','jumpLand','FallDown','cringe','SitStart','Sleep','run','walk','GolfPuttSwing','GolfPuttLoop','GolfRotateLeft','GolfRotateRight','swim','Catching','Sit',]
+from direct.gui.DirectGui import DirectButton
+def previousAnim():
+   global animList, currentAnim
+   if currentAnim != 21:
+       currentAnim -= 1
+       base.localAvatar.b_setAnimState((animList[currentAnim]))
+   else:
+       currentAnim = 0
+       pass
+newGuiImg = loader.loadModel("phase_3/models/gui/tt_m_gui_mat_mainGui.bam")
+newBtnImg = DirectButton(frameSize=None, text='', image=(newGuiImg.find('**/tt_t_gui_mat_shuffleArrowUp'), \
+newGuiImg.find('**/tt_t_gui_mat_shuffleArrowDown'), newGuiImg.find('**/tt_t_gui_mat_shuffleArrowUp')), relief=None, command=previousAnim, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-0.9, 0,0.66), text_scale=0.045555, borderWidth=(0.015, 0.01))
+from direct.gui.DirectGui import DirectButton
+def nextAnim():
+   global animList, currentAnim
+   if currentAnim != 21:
+       currentAnim += 1
+       base.localAvatar.b_setAnimState((animList[currentAnim]))
+   else:
+       currentAnim = 0
+       pass
+newGuiImg2 = loader.loadModel("phase_3/models/gui/tt_m_gui_mat_mainGui.bam")
+newBtnImg2 = DirectButton(frameSize=None, text='', image=(newGuiImg2.find('**/tt_t_gui_mat_shuffleArrowUp'), \
+newGuiImg2.find('**/tt_t_gui_mat_shuffleArrowDown'), newGuiImg2.find('**/tt_t_gui_mat_shuffleArrowUp')), relief=None, command=nextAnim, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-0.4, 0,0.66), text_scale=0.045555, borderWidth=(0.015, 0.01))
+newGuiImg2.setHpr(180,0,0)
+newBtnImg2.setHpr(180,0,0)
+from direct.gui.OnscreenText import OnscreenText
+from direct.gui.DirectGui import *
+from pandac.PandaModules import TextNode
+bk_text = "Toon\nAnimation"
+textObject = OnscreenText(text = bk_text, pos = (-0.65,0.66),
+scale = 0.07,fg=(0.15,0.15,0.15,1),align=TextNode.ACenter,mayChange=1)
+def UNLOAD():
+   base.localAvatar.showHpString('\x01candidate_inactive\x01Buttons Unloaded', duration=2, scale=0.5)
+   for b in (ImgBtn1, ImgBtn2, ImgBtn3, ImgBtn4, ImgBtn5, ImgBtn6, ImgBtnSkipTrolley, ImgBtnSplash, ImgBtn7, ImgBtn8, ImgBtn9, ImgBtn10, ImgBtn11, ImgBtn12, ImgBtn13, ImgBtn15, ImgBtn16, ImgBtn17, ImgBtn18, ImgBtn19, ImgBtnPond, ImgBtn20, ImgBtn21, ImgBtn22, ImgBtn23, ImgBtn24, ImgBtn25, ImgBtn26, ImgBtn27, ImgBtn28, ImgBtn29, ImgBtn30, ImgBtnRaid, ImgBtnTeamBot, ImgBtn32, ImgBtn44, newBtnImg, newBtnImg2, ImgBtnUnload):
+      try:
+         b.destroy()
+      except:
+         pass
+ButtonImage = loader.loadModel("phase_3/models/gui/quit_button.bam")
+ImgBtnUnload = DirectButton(frameSize=None, text='Unload', image=(ButtonImage.find('**/QuitBtn_UP'), \
+ButtonImage.find('**/QuitBtn_DN'), ButtonImage.find('**/QuitBtn_RLVR')), relief=None, command=UNLOAD, text_pos=(0, -0.015), \
+geom=None, pad=(0.01, 0.01), suppressKeys=0, pos = (-1.15,-0,-.74), text_scale=0.059, borderWidth=(0.13, 0.01), scale=.7)

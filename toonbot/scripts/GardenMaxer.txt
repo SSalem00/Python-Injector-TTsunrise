@@ -16,9 +16,9 @@ class GardenMaxer:
 
     def __init__(self):
         self.shouldContinue = False
-        self.dailyLoop = False         # re-run once a day while client is open
-        self.plantNew = True           # replant empty plots after harvest/water
-        self.sellAll = True            # sell the flower basket at the wheelbarrow
+        self.dailyLoop = False
+        self.plantNew = True
+        self.sellAll = True
         self.harvested = 0
         self.watered = 0
         self.planted = 0
@@ -34,14 +34,7 @@ class GardenMaxer:
                                     'str(gardenMaxer.planted)'],
                                    'GARDEN MAXER', None)
 
-    # ---------------------------------------------------------- safety hooks
-    # Planting/harvesting normally plays a dig/water animation that ends by
-    # restoring the camera (unsetCameraPosForPetInteraction). Because the bot
-    # fires plantFlower/removeItem directly (it never ran the interaction that
-    # SETS prevIdealPos), that camera cleanup crashes the client. We replace the
-    # whole movie with an instant movieDone(): no animation, no camera ival, no
-    # crash - and planting/harvesting becomes instant. Same pattern as the Fish
-    # Maxer's elevator safety wrap.
+    # Stub out setMovie - the real one crashes the client when we fire updates directly.
     SAFE_CLASSES = (DistributedLawnDecor.DistributedLawnDecor,
                     DistributedPlantBase.DistributedPlantBase,
                     DistributedGardenPlot.DistributedGardenPlot,
@@ -55,7 +48,6 @@ class GardenMaxer:
                     cls._gmOrigSetMovie = cls.__dict__.get('setMovie', None)
 
                     def _gmSetMovie(decSelf, mode, avId):
-                        # Only WE complete the movie (skip other toons' visuals).
                         try:
                             if avId == base.localAvatar.doId:
                                 decSelf.movieDone()
@@ -72,7 +64,7 @@ class GardenMaxer:
                     orig = cls._gmOrigSetMovie
                     if orig is None:
                         try:
-                            del cls.setMovie       # restore inherited version
+                            del cls.setMovie
                         except:
                             pass
                     else:
@@ -81,9 +73,7 @@ class GardenMaxer:
             except:
                 pass
 
-    # -- data --
-    # Every (species, variety) flower in the game that is a NORMAL flower
-    # (special == -1; we skip gag-tree / statuary 'special' recipes).
+    # Every normal flower; special != -1 is a gag tree / statuary.
     def allVarieties(self):
         out = []
         try:
@@ -134,8 +124,7 @@ class GardenMaxer:
     def missingCount(self):
         return len(self.allVarieties()) - self.ownedCount()
 
-    # Max number of beans we're allowed to plant with our current shovel skill.
-    # The server rejects any recipe longer than this, so we must respect it.
+    # Shovel's bean cap - the server rejects longer recipes.
     def maxBeans(self):
         try:
             shovel = getattr(base.localAvatar, 'shovel', 0)
@@ -144,12 +133,7 @@ class GardenMaxer:
         except:
             return 1
 
-    # Every uncollected variety we can plant with our current shovel, sorted
-    # cheapest first. We plant one DISTINCT variety per plot so a pass fills the
-    # garden with a spread of new flowers instead of 10 copies of one. (isOwned
-    # only flips when a flower is HARVESTED, not planted, so we can't lean on it
-    # to avoid dupes within a single pass, we track that ourselves in
-    # plantEmpties.)
+    # Uncollected varieties we can afford, cheapest first.
     def missingCandidates(self):
         maxB = self.maxBeans()
         out = []
@@ -160,8 +144,25 @@ class GardenMaxer:
             if c <= 0 or c > maxB:
                 continue
             out.append((c, s, v))
-        out.sort()          # cheapest (fewest beans) first
+        out.sort()
         return out
+
+    # Owned recipes to replant for shovel skill, cap-cost first.
+    def grindCandidates(self):
+        maxB = self.maxBeans()
+        best = []
+        rest = []
+        for (s, v) in self.allVarieties():
+            c = self.costFor(s, v)
+            if c <= 0 or c > maxB:
+                continue
+            if c == maxB:
+                best.append((c, s, v))
+            else:
+                rest.append((c, s, v))
+        rest.sort()
+        rest.reverse()
+        return best + rest
 
     def getMoney(self):
         try:
@@ -169,11 +170,8 @@ class GardenMaxer:
         except:
             return 0
 
-    # -- estate / objects --
     def inEstate(self):
-        # Estate zones are allocated dynamically, so getHoodId() doesn't reliably
-        # map to MyEstate. The robust signal is the active Place class being the
-        # Estate place. We also accept a couple of fallbacks just in case.
+        # Estate zones are dynamic, so check the Place, not the zone id.
         try:
             if 'Estate' in base.cr.playGame.getPlace().__class__.__name__:
                 return True
@@ -196,7 +194,7 @@ class GardenMaxer:
             pass
         return False
 
-    # Empty flower plots we own (planted plots become DistributedFlower instead).
+    # Empty flower plots (planted ones become DistributedFlower).
     def myFlowerPlots(self):
         out = []
         try:
@@ -214,7 +212,6 @@ class GardenMaxer:
                 pass
         return out
 
-    # Flowers (already planted) that we own.
     def myFlowers(self):
         out = []
         try:
@@ -229,8 +226,7 @@ class GardenMaxer:
                 out.append(f)
         return out
 
-    # Gag trees we own. We never harvest these (that's picking gags) - we only
-    # top off their water so they don't wilt while we're away.
+    # Trees are watered only, never harvested.
     def myTrees(self):
         out = []
         try:
@@ -260,7 +256,6 @@ class GardenMaxer:
         except:
             return True
 
-    # -- main pass --
     def start(self):
         self.shouldContinue = True
         self.harvested = 0
@@ -291,38 +286,26 @@ class GardenMaxer:
         self.walk()
         Sequence(Wait(1), Func(self.doPass)).start()
 
-    # A pass walks a queue of (action, object) steps with small waits between,
-    # so each sendUpdate has time to settle (mirrors the Fish Maxer pacing).
+    # Waits let each sendUpdate settle; watering runs last to catch new plants.
     def doPass(self):
         if not self.shouldContinue:
             return
         self.autoerGui.display.newLine('--- Daily garden pass ---')
         seq = Sequence()
-        # 0. Sell whatever is already in the basket so there's room to pick.
         seq.append(Func(self.sellBasket))
         seq.append(Wait(1.5))
-        # 1. Harvest everything that's ready (picked flowers go to the basket).
         for f in self.myFlowers():
             if self.isReady(f):
                 seq.append(Func(self.harvest, f))
                 seq.append(Wait(1.0))
-        # 2. Sell everything we just picked (frees jellybeans for replanting).
         seq.append(Func(self.sellBasket))
         seq.append(Wait(1.5))
-        # 3. Replant the freed/empty plots.
         seq.append(Wait(2))
         seq.append(Func(self.plantEmpties))
-        # 4. Wait for the newly-planted flower DOs to generate, THEN water every
-        #    flower that needs it - both the ones we just planted and any older
-        #    ones still growing. (Watering must come last so fresh plants count.)
-        #    waterAll chains into finishPass itself, so finishPass can't fire
-        #    mid-watering and stop the bot early.
         seq.append(Wait(3))
         seq.append(Func(self.waterAll))
         seq.start()
 
-    # Water every flower of ours that isn't full and isn't maxed on water, then
-    # finish the pass once all the watering steps have run.
     def waterAll(self):
         if not self.shouldContinue:
             return
@@ -331,8 +314,6 @@ class GardenMaxer:
             if not self.isReady(f) and self.needsWater(f):
                 wseq.append(Func(self.water, f))
                 wseq.append(Wait(1.0))
-        # Top off gag trees too (water any that aren't full - grown or not, since
-        # we never harvest trees, we just keep them from wilting).
         for t in self.myTrees():
             if self.needsWater(t):
                 wseq.append(Func(self.water, t))
@@ -366,14 +347,13 @@ class GardenMaxer:
             self.watered += 1
         except:
             pass
-        # Some servers only commit the water level on the "done" update.
+        # Some servers only commit water on the done update.
         try:
             flower.sendUpdate('waterPlantDone')
         except:
             pass
 
-    # Sell the entire flower basket at the wheelbarrow. The estate DO handles
-    # the sale: completeFlowerSale([1]) cashes in everything in the basket.
+    # Cash in the whole basket.
     def sellBasket(self):
         if not self.shouldContinue or not self.sellAll:
             return
@@ -410,18 +390,32 @@ class GardenMaxer:
         if not self.shouldContinue or not self.plantNew:
             return
         candidates = self.missingCandidates()
+        grind = None
+        gidx = 0
         money = self.getMoney()
         idx = 0
         for plot in self.myFlowerPlots():
-            # Advance to the next candidate we can still afford. Each plant
-            # spends jellybeans equal to its bean count, so drop 'money' as we go.
+            # Skip what we can't afford.
             while idx < len(candidates) and candidates[idx][0] > money:
                 idx += 1
-            if idx >= len(candidates):
-                self.autoerGui.display.newLine('No more affordable new varieties this pass')
-                break
-            c, s, v = candidates[idx]
-            idx += 1                 # each variety used at most once per pass
+            if idx < len(candidates):
+                c, s, v = candidates[idx]
+                idx += 1
+            else:
+                if grind is None:
+                    grind = self.grindCandidates()
+                    self.autoerGui.display.newLine('No new varieties affordable - grinding %s-bean recipes for shovel skill' % self.maxBeans())
+                pick = None
+                for n in range(len(grind)):
+                    cand = grind[(gidx + n) % len(grind)]
+                    if cand[0] <= money:
+                        pick = cand
+                        gidx = (gidx + n + 1) % len(grind)
+                        break
+                if pick is None:
+                    self.autoerGui.display.newLine('Not enough jellybeans to plant (%s left)' % money)
+                    break
+                c, s, v = pick
             money -= c
             try:
                 base.localAvatar.setPos(plot.getPos(render))
@@ -469,7 +463,6 @@ class GardenMaxer:
         except:
             pass
 
-    # -- options --
     def loopOn(self):
         self.dailyLoop = True
         base.localAvatar.setSystemMessage(0, 'Garden Maxer: Daily loop ON (re-runs every 24h while open)')
@@ -498,7 +491,6 @@ class GardenMaxer:
         base.localAvatar.setSystemMessage(0, 'Garden Maxer: Auto-sell OFF (keep flowers in basket)')
         self.autoerGui.display.newLine('Auto-sell OFF')
 
-    # --lifecycle --
     def setStop(self):
         self.shouldContinue = False
         if self.loopTask is not None:

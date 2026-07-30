@@ -186,12 +186,14 @@ class AutoerGui:
     def updateAllText(self,task):
         if self.startTime:
             self.formattedTime=str(datetime.timedelta(seconds=round(timeModule.time()-self.startTime)))
-        
-        self.text[0].setText(self.catagories[0]+': '+eval(self.statsMethods[0]))
-        self.text[1].setText(self.catagories[1]+': '+eval(self.statsMethods[1]))
-        self.text[2].setText(self.catagories[2]+': '+eval(self.statsMethods[2]))
-        self.text[3].setText(self.catagories[3]+': '+eval(self.statsMethods[3]))
-        self.text[4].setText(self.catagories[4]+': '+eval(self.statsMethods[4]))
+        #The stats eval base.localAvatar, which is gone during disconnect.
+        if not hasattr(base,'localAvatar') or base.localAvatar is None:
+            return task.cont
+        for i in range(5):
+            try:
+                self.text[i].setText(self.catagories[i]+': '+eval(self.statsMethods[i]))
+            except:
+                pass
         return task.cont
     
     def workOutNumberAnHour(self,number):
