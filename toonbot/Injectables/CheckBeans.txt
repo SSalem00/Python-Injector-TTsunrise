@@ -1,5 +1,4 @@
-#Quick synchronous bean check - bank the wallet then print the total so the injector
-#console captures it. Inject AFTER firing a money unite to confirm it credited.
+
 try:
     _w = base.localAvatar.getMoney()
     if _w > 0:
