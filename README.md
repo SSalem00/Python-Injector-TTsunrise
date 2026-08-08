@@ -16,7 +16,7 @@ The original **TeamFD injector** patched `PyEval_EvalCode` in `python24.dll` and
 
 ## Setup
 
-**Requirements:** Windows 10/11 64-bit, Administrator, Toontown Sunrise at `C:\Program Files (x86)\Disney\Disney Online\ToontownOnline\`
+**Requirements:** Windows 10/11 64-bit, Administrator
 
 1. Download `TTsunriseInjector.7z` from [Releases](../../releases/latest)
 2. Copy `toonbot\` and `TaskBot\` into your Toontown install directory. Both are required:
