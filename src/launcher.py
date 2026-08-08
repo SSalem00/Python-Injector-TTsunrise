@@ -1,9 +1,5 @@
 """
-Toontown auto-injecting launcher.
-
-Spawns ToontownLauncher.exe so the user can log in, watches for Toontown.exe
-to appear, injects inject.dll via CreateRemoteThread(LoadLibraryA), then opens
-the dashboard. One click instead of three programs.
+Launches Toontown, waits for it, queues ToonBot.py in via Py_AddPendingCall.
 """
 
 import ctypes
@@ -12,44 +8,91 @@ import struct
 import subprocess
 import sys
 import time
+import winreg
 from ctypes import wintypes
 from pathlib import Path
 
-# ---- paths -----------------------------------------------------------------
-ROOT          = Path(r"C:\Program Files (x86)\Disney\Disney Online\ToontownOnline")
-LAUNCHER_EXE  = ROOT / "ToontownLauncher.exe"
 GAME_EXE_NAME = "Toontown.exe"
+DEFAULT_ROOT  = Path(r"C:\Program Files (x86)\Disney\Disney Online\ToontownOnline")
+
+_UNINSTALL_HIVES = [
+    (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+    (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+    (winreg.HKEY_CURRENT_USER,  r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+]
 
 
-def _bundled_or_install(*parts):
-    """Prefer a copy bundled inside the PyInstaller onefile (sys._MEIPASS);
-    fall back to the on-disk install location when run as a plain script."""
-    base = getattr(sys, "_MEIPASS", None)
-    if base:
-        p = Path(base).joinpath(*parts)
-        if p.exists():
-            return p
-    return ROOT.joinpath(*parts)
+def _registry_roots():
+    """Install dirs from uninstall entries mentioning toontown."""
+    for hive, base in _UNINSTALL_HIVES:
+        try:
+            root_key = winreg.OpenKey(hive, base)
+        except OSError:
+            continue
+        try:
+            for i in range(winreg.QueryInfoKey(root_key)[0]):
+                try:
+                    sub = winreg.EnumKey(root_key, i)
+                    k = winreg.OpenKey(root_key, sub)
+                except OSError:
+                    continue
+                try:
+                    values = {}
+                    for name in ("DisplayName", "InstallLocation", "UninstallString"):
+                        try:
+                            values[name] = str(winreg.QueryValueEx(k, name)[0]).strip().strip('"')
+                        except OSError:
+                            values[name] = ""
+                    haystack = (sub + " " + values["DisplayName"]).lower()
+                    if "toontown" not in haystack:
+                        continue
+                    for name in ("InstallLocation", "UninstallString"):
+                        raw = values[name]
+                        if not raw:
+                            continue
+                        p = Path(raw)
+                        yield p if p.is_dir() else p.parent
+                finally:
+                    k.Close()
+        finally:
+            root_key.Close()
 
 
-INJECT_DLL    = _bundled_or_install("TTInjector", "TTHook.dll")
-# Anchored to the install dir (not __file__) so paths stay correct when frozen
-# into a PyInstaller onefile EXE, whose __file__ lives in a temp extract dir.
+def find_root() -> Path:
+    """Locate the install. TT_ROOT overrides. Candidates need Toontown.exe."""
+    candidates = []
+    env = os.environ.get("TT_ROOT")
+    if env:
+        candidates.append(Path(env))
+    candidates.extend(_registry_roots())
+    candidates.append(DEFAULT_ROOT)
+
+    for c in candidates:
+        try:
+            if (c / GAME_EXE_NAME).exists():
+                return c
+        except OSError:
+            continue
+    return DEFAULT_ROOT
+
+
+ROOT          = find_root()
+LAUNCHER_EXE  = ROOT / "ToontownLauncher.exe"
+
+# Off ROOT, not __file__, which points into a temp dir when frozen.
 TOONBOT_PY    = ROOT / "toonbot" / "ToonBot.py"
 DASHBOARD     = ROOT / "toonbot" / "dashboard.py"
 
-WATCH_TIMEOUT_SEC    = 600     # 10 minutes to log in
+WATCH_TIMEOUT_SEC    = 600     # 10 min to log in
 POLL_INTERVAL_SEC    = 0.5
-PRE_INJECT_DELAY_SEC = 15.0    # wait this long after Toontown.exe is detected
+PRE_INJECT_DELAY_SEC = 15.0    # settle time after the process appears
 
-# ---- win32 -----------------------------------------------------------------
 PROCESS_ALL_ACCESS      = 0x1F0FFF
 MEM_COMMIT_RESERVE      = 0x1000 | 0x2000
 PAGE_READWRITE          = 0x04
 PAGE_EXECUTE_READWRITE  = 0x40
 INFINITE                = 0xFFFFFFFF
 LIST_MODULES_32BIT      = 0x01
-LIST_MODULES_64BIT      = 0x02
 DETACHED_PROCESS        = 0x00000008
 CREATE_NO_WINDOW        = 0x08000000
 TH32CS_SNAPPROCESS      = 0x00000002
@@ -87,8 +130,6 @@ k32.CreateRemoteThread.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_si
 k32.CreateRemoteThread.restype  = wintypes.HANDLE
 k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
 k32.WaitForSingleObject.restype  = wintypes.DWORD
-k32.IsWow64Process.argtypes     = [wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
-k32.IsWow64Process.restype      = wintypes.BOOL
 k32.GetModuleHandleW.argtypes   = [wintypes.LPCWSTR]
 k32.GetModuleHandleW.restype    = wintypes.HMODULE
 k32.GetProcAddress.argtypes     = [wintypes.HMODULE, wintypes.LPCSTR]
@@ -127,13 +168,6 @@ def find_pid_by_name(name: str):
         k32.CloseHandle(snap)
 
 
-def _is_target_wow64(h_proc) -> bool:
-    out = wintypes.BOOL()
-    if not k32.IsWow64Process(h_proc, ctypes.byref(out)):
-        return False
-    return bool(out.value)
-
-
 def _rpm(h_proc, addr, size):
     buf = (ctypes.c_ubyte * size)()
     n = ctypes.c_size_t(0)
@@ -142,14 +176,14 @@ def _rpm(h_proc, addr, size):
     return bytes(buf[: n.value])
 
 
-def _find_remote_module(h_proc, dll_name: str, want_32bit: bool):
-    flag = LIST_MODULES_32BIT if want_32bit else LIST_MODULES_64BIT
+def _find_remote_module(h_proc, dll_name: str):
+    # 32-bit list: the game is 32-bit, this launcher may not be.
     needed = wintypes.DWORD()
-    psapi.EnumProcessModulesEx(h_proc, None, 0, ctypes.byref(needed), flag)
+    psapi.EnumProcessModulesEx(h_proc, None, 0, ctypes.byref(needed), LIST_MODULES_32BIT)
     if needed.value == 0:
         return None
     arr = (ctypes.c_void_p * (needed.value // ctypes.sizeof(ctypes.c_void_p)))()
-    if not psapi.EnumProcessModulesEx(h_proc, arr, needed.value, ctypes.byref(needed), flag):
+    if not psapi.EnumProcessModulesEx(h_proc, arr, needed.value, ctypes.byref(needed), LIST_MODULES_32BIT):
         return None
     name = ctypes.create_unicode_buffer(260)
     want = dll_name.lower()
@@ -160,10 +194,6 @@ def _find_remote_module(h_proc, dll_name: str, want_32bit: bool):
         if name.value.lower() == want:
             return mod
     return None
-
-
-def _find_remote_kernel32(h_proc, want_32bit: bool):
-    return _find_remote_module(h_proc, "kernel32.dll", want_32bit)
 
 
 def _find_export_rva(h_proc, base, symbol: str):
@@ -194,69 +224,14 @@ def _find_export_rva(h_proc, base, symbol: str):
     return None
 
 
-def _loadlibrary_addr(h_proc):
-    """Address of LoadLibraryA inside the target, regardless of bitness mismatch."""
-    self_is_64   = struct.calcsize("P") == 8
-    target_is_32 = _is_target_wow64(h_proc) or not self_is_64
-
-    if self_is_64 == (not target_is_32):
-        # bitness matches — kernel32 lives at the same base in both processes
-        h = k32.GetModuleHandleW("kernel32.dll")
-        return k32.GetProcAddress(h, b"LoadLibraryA")
-
-    # 64-bit Python injecting into 32-bit target: walk the target's 32-bit kernel32.
-    base = _find_remote_kernel32(h_proc, want_32bit=True)
-    if not base:
-        raise OSError("32-bit kernel32 not found in target (loader not ready?)")
-    rva = _find_export_rva(h_proc, base, "LoadLibraryA")
-    if not rva:
-        raise OSError("LoadLibraryA export not found in target kernel32")
-    return base + rva
-
-
-def inject(pid: int, dll_path: str):
-    h = k32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
-    if not h:
-        raise OSError(f"OpenProcess({pid}) failed — try running as administrator")
-    try:
-        addr = _loadlibrary_addr(h)
-        payload = dll_path.encode("utf-8") + b"\x00"
-        remote = k32.VirtualAllocEx(h, None, len(payload), MEM_COMMIT_RESERVE, PAGE_READWRITE)
-        if not remote:
-            raise OSError("VirtualAllocEx failed")
-        written = ctypes.c_size_t(0)
-        if not k32.WriteProcessMemory(h, remote, payload, len(payload), ctypes.byref(written)):
-            raise OSError("WriteProcessMemory failed")
-        tid = wintypes.DWORD(0)
-        th = k32.CreateRemoteThread(h, None, 0, addr, remote, 0, ctypes.byref(tid))
-        if not th:
-            raise OSError("CreateRemoteThread failed")
-        k32.WaitForSingleObject(th, INFINITE)
-        k32.CloseHandle(th)
-    finally:
-        k32.CloseHandle(h)
-
-
 def _queue_python_code(pid: int, code: str):
-    """
-    Thread-safe Python injection via Py_AddPendingCall.
-
-    Calling PyRun_SimpleString directly from a foreign thread is unsafe:
-    the thread has no Python thread state, and importing 'threading' inside
-    the code enables the GIL mid-execution — the thread then exits without
-    releasing it, deadlocking the game.
-
-    Py_AddPendingCall IS thread-safe (no GIL needed).  It enqueues a
-    (func, arg) pair that the main interpreter thread drains on the next
-    bytecode tick.  We queue (PyRun_SimpleString, code_ptr) using a tiny
-    20-byte x86 shellcode stub, then our remote thread exits immediately
-    without ever touching the GIL.
-    """
+    # PyRun_SimpleString from a foreign thread deadlocks the GIL.
+    # Py_AddPendingCall is safe without a thread state; the main thread runs it.
     h = k32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
     if not h:
-        raise OSError(f"OpenProcess({pid}) failed — try running as administrator")
+        raise OSError(f"OpenProcess({pid}) failed - try running as administrator")
     try:
-        base = _find_remote_module(h, "python24.dll", want_32bit=True)
+        base = _find_remote_module(h, "python24.dll")
         if not base:
             raise OSError("python24.dll not loaded in target (game still booting?)")
 
@@ -270,7 +245,6 @@ def _queue_python_code(pid: int, code: str):
             raise OSError("Py_AddPendingCall not found in python24.dll")
         papc_addr = base + papc_rva
 
-        # Write the Python code string (ASCII) into readable target memory.
         payload = code.encode("ascii") + b"\x00"
         code_mem = k32.VirtualAllocEx(
             h, None, len(payload), MEM_COMMIT_RESERVE, PAGE_READWRITE
@@ -280,14 +254,7 @@ def _queue_python_code(pid: int, code: str):
         written = ctypes.c_size_t(0)
         k32.WriteProcessMemory(h, code_mem, payload, len(payload), ctypes.byref(written))
 
-        # x86 shellcode (called as stdcall LPTHREAD_START_ROUTINE by CreateRemoteThread):
-        #   push  code_mem        ; arg  → PyRun_SimpleString receives this
-        #   push  pyrun_addr      ; func → PyRun_SimpleString
-        #   mov   eax, papc_addr
-        #   call  eax             ; Py_AddPendingCall(PyRun_SimpleString, code_mem)
-        #   add   esp, 8          ; cdecl caller-cleanup (2 args × 4 bytes)
-        #   xor   eax, eax        ; return 0  (DWORD thread exit code)
-        #   ret   4               ; stdcall epilogue — pop lpParameter pushed by CRT
+        # Py_AddPendingCall(PyRun_SimpleString, code_mem); return 0; ret 4 (stdcall).
         shellcode = (
             b"\x68" + struct.pack("<I", code_mem)    # push code_mem
             + b"\x68" + struct.pack("<I", pyrun_addr) # push pyrun_addr
@@ -335,79 +302,64 @@ def wait_for_game(timeout: float, poll: float):
         now = time.monotonic()
         if now - last_log >= 5:
             remaining = int(deadline - now)
-            print(f"[*] still waiting for {GAME_EXE_NAME}… ({remaining}s left)")
+            print(f"[*] still waiting for {GAME_EXE_NAME}... ({remaining}s left)")
             last_log = now
         time.sleep(poll)
     return None
 
 
+def _print_log(severity, message):
+    print(message)
+
+
+def inject_and_bootstrap(pid, log=_print_log):
+    """Queue ToonBot.py into the game, wait for its :8888 bridge.
+
+    log(severity, message) sinks progress. Returns True once the bridge answers.
+    """
+    if not TOONBOT_PY.exists():
+        log("error", f"[!] {TOONBOT_PY} not found - bridge won't start")
+        return False
+
+    try:
+        _queue_python_code(pid, "execfile(r'{}')".format(str(TOONBOT_PY)))
+        log("system", "[+] bridge bootstrap queued")
+    except OSError as e:
+        log("error", f"[!] queue failed: {e}")
+        return False
+
+    for _ in range(20):
+        time.sleep(0.5)
+        if _bridge_is_up():
+            log("system", "[+] bridge live on 127.0.0.1:8888")
+            return True
+
+    log("warn", "[!] bridge not responding - check in-game for a ToonBot.py error")
+    return False
+
+
 def main():
     if not LAUNCHER_EXE.exists():
         sys.exit(f"missing: {LAUNCHER_EXE}")
-    if not INJECT_DLL.exists():
-        sys.exit(f"missing: {INJECT_DLL}")
 
-    existing = find_pid_by_name(GAME_EXE_NAME)
-    if existing:
-        print(f"[*] {GAME_EXE_NAME} already running (pid {existing}) — skipping launcher.")
-        game_pid = existing
+    game_pid = find_pid_by_name(GAME_EXE_NAME)
+    if game_pid:
+        print(f"[*] {GAME_EXE_NAME} already running (pid {game_pid}) - skipping launcher.")
     else:
         print(f"[*] starting login launcher: {LAUNCHER_EXE}")
         subprocess.Popen([str(LAUNCHER_EXE)], cwd=str(LAUNCHER_EXE.parent))
-        print(f"[*] log in, then wait — watching for {GAME_EXE_NAME} to appear.")
+        print(f"[*] log in, then wait - watching for {GAME_EXE_NAME} to appear.")
         game_pid = wait_for_game(WATCH_TIMEOUT_SEC, POLL_INTERVAL_SEC)
         if not game_pid:
             sys.exit(f"[!] timed out after {WATCH_TIMEOUT_SEC}s waiting for {GAME_EXE_NAME}")
-        print(f"[+] detected {GAME_EXE_NAME} pid {game_pid} — "
-              f"waiting {PRE_INJECT_DELAY_SEC:.0f}s for game to finish loading…")
-        for remaining in range(int(PRE_INJECT_DELAY_SEC), 0, -5):
-            print(f"    {remaining}s")
-            time.sleep(5)
-        # finish any sub-5s remainder
-        leftover = PRE_INJECT_DELAY_SEC - (int(PRE_INJECT_DELAY_SEC) // 5) * 5
-        if leftover > 0:
-            time.sleep(leftover)
+        print(f"[+] detected pid {game_pid} - waiting {PRE_INJECT_DELAY_SEC:.0f}s for load...")
+        time.sleep(PRE_INJECT_DELAY_SEC)
 
-    # Step 1: inject.dll — opens the manual REPL window in-game (optional).
-    last_err = None
-    for attempt in range(20):
-        try:
-            inject(game_pid, str(INJECT_DLL))
-            print(f"[+] injected {INJECT_DLL.name}")
-            break
-        except OSError as e:
-            last_err = e
-            time.sleep(0.25)
-    else:
-        print(f"[~] inject.dll failed (non-fatal): {last_err}")
-
-    # Step 2: queue ToonBot.py on the main interpreter thread via Py_AddPendingCall.
-    # Our shellcode returns immediately — no GIL touched, no crash.
-    if TOONBOT_PY.exists():
-        # Pure ASCII bootstrap — no imports, no threading, safe to send as const char*.
-        bootstrap = "execfile(r'{}')".format(str(TOONBOT_PY))
-        print(f"[*] queuing {TOONBOT_PY.name} via Py_AddPendingCall…")
-        try:
-            _queue_python_code(game_pid, bootstrap)
-            print("[+] queued — ToonBot.py will run on next interpreter tick")
-        except OSError as e:
-            sys.exit(f"[!] queue failed: {e}")
-
-        print("[*] probing 127.0.0.1:8888…")
-        for i in range(20):
-            time.sleep(0.5)
-            if _bridge_is_up():
-                print(f"[+] bridge live on :8888 after ~{(i + 1) * 0.5:.0f}s")
-                break
-        else:
-            print("[!] bridge not responding — check in-game for a ToonBot.py error.")
-    else:
-        print(f"[~] {TOONBOT_PY} not found — dashboard bridge won't start.")
+    inject_and_bootstrap(game_pid)
 
     if DASHBOARD.exists():
         print(f"[+] opening dashboard: {DASHBOARD}")
-        # Launch with pythonw (no console) and no extra window — the dashboard
-        # GUI is the only window the user should see.
+        # pythonw so no console window shows up next to the dashboard.
         pythonw = Path(sys.executable).with_name("pythonw.exe")
         interpreter = str(pythonw) if pythonw.exists() else sys.executable
         subprocess.Popen(
@@ -428,4 +380,4 @@ if __name__ == "__main__":
     except Exception:
         import traceback
         traceback.print_exc()
-        input("\nPress Enter to exit…")
+        input("\nPress Enter to exit...")

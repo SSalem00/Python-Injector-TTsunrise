@@ -11,11 +11,9 @@ from direct.gui.DirectGui import *
 from direct.interval.IntervalGlobal import *
 from toontown.effects import DistributedFireworkShow
 
-# -- Dashboard IPC bridge (Python 2.4 compatible) ----------------------------
-# Panda3D is single-threaded: touching the scene graph / messenger / taskMgr
-# from a socket worker thread engages Panda's lock and crashes the C runtime.
-# So worker threads only do socket I/O; received code is queued and exec'd on
-# the MAIN thread by a per-frame taskMgr task.
+# Dashboard IPC bridge. Python 2.4.
+# Panda3D is single-threaded, so worker threads only do socket I/O.
+# Received code is queued here and run on the main thread by a taskMgr task.
 _bridge_jobs = []
 _bridge_lock = threading.Lock()
 
@@ -94,8 +92,13 @@ def _start_dashboard_bridge(host='127.0.0.1', port=8888):
     t.setDaemon(True)
     t.start()
 
-_start_dashboard_bridge()
-# ----------------------------------------------------------------------------
+# The launcher re-runs this on every attach. Without the guard each attach
+# leaks another pump task and rebinds :8888 over the live listener.
+# ponytail: plain flag, no lock. This only ever runs on the main thread.
+if not globals().get('_bridge_started'):
+    _bridge_started = True
+    _start_dashboard_bridge()
+
 for attribute in dir(DistributedFireworkShow.DistributedFireworkShow):
     exec('DistributedFireworkShow.DistributedFireworkShow.'+attribute+'=lambda *args,**kwds: None')
 
@@ -487,8 +490,6 @@ class ToonBot:
             if script['location'] == 'None':
                 base.localAvatar.setSystemMessage(0, ToonBot.TOONBOT_STRING + 'Cannot load a script with no location')
                 return
-            #if not self.downloadScript(script):
-            #    return
             myfile=open(ToonBot.SCRIPTS_DIRECTORY + script['name'] + '.txt','r')
             for line in myfile:
                 if '#outdated' in line:
@@ -681,8 +682,4 @@ def executeToonbot(type):
         return toonBot
 
 toonBot=ToonBot()
-#myfile=open(ToonBot.SCRIPTS_DIRECTORY + 'AutoerGui.txt','w')
-#script=urllib.urlopen('http://download.sunrise.games/hax/ToonBot/AutoerGui.py').read()
-#myfile.write(script)
-#myfile.close()
 execfile(ToonBot.SCRIPTS_DIRECTORY + 'AutoerGui.txt', globals())
