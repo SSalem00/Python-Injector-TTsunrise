@@ -29,21 +29,6 @@ class FishMaxer:
                   ToontownGlobals.SleetStreet,
                   ToontownGlobals.LullabyLane]
 
-    # POND_ZONES entries that need a tunnel to reach.
-    STREET_BRANCHES = [ToontownGlobals.SillyStreet,
-                       ToontownGlobals.LoopyLane,
-                       ToontownGlobals.PunchlinePlace,
-                       ToontownGlobals.BarnacleBoulevard,
-                       ToontownGlobals.SeaweedStreet,
-                       ToontownGlobals.LighthouseLane,
-                       ToontownGlobals.ElmStreet,
-                       ToontownGlobals.AltoAvenue,
-                       ToontownGlobals.BaritoneBoulevard,
-                       ToontownGlobals.TenorTerrace,
-                       ToontownGlobals.WalrusWay,
-                       ToontownGlobals.SleetStreet,
-                       ToontownGlobals.LullabyLane]
-
     POND_NAMES = {ToontownGlobals.ToontownCentral: 'Toontown Central',
                   ToontownGlobals.DonaldsDock: "Donald's Dock",
                   ToontownGlobals.DaisyGardens: 'Daisy Gardens',
@@ -65,7 +50,7 @@ class FishMaxer:
                   ToontownGlobals.SleetStreet: 'Sleet Street',
                   ToontownGlobals.LullabyLane: 'Lullaby Lane'}
 
-    # DNA visgroup cell holding each street's pond - we addInterest to it.
+    # DNA visgroup cell holding each street's pond - the teleport destination.
     STREET_POND_ZONE = {ToontownGlobals.SillyStreet: 2156,
                         ToontownGlobals.LoopyLane: 2236,
                         ToontownGlobals.PunchlinePlace: 2341,
@@ -89,12 +74,16 @@ class FishMaxer:
         self.currentTarget = None     # (genus, species) we are hunting
         self.targetPond = None        # zone id of the pond we are headed to
         self.spot = None              # the DistributedFishingSpot we boarded
-        self.streetInterest = None    # addInterest handle for a street pond cell
         self.sellHood = ToontownGlobals.DonaldsDock
         self.skipUltraRare = True     # skip rarity > maxRarity (hard for low rods)
         self.maxRarity = 9            # 10 = ultra rare; skip it by default
         self.rodOverride = None       # None = auto-detect; else a rod id 0-4
         self.castTries = 0            # how long we've waited to be seated
+        self.beanTries = 0            # failed bank withdrawals in a row
+        self.lastFishNum = 0          # fishNum at the last watchdog tick
+        self.watchdogOn = False
+        self.offDockTicks = 0
+        self.dockWatchOn = False
         self.autoerGui = AutoerGui('Fish Maxer',
                                    ['Run Time', 'Species Owned', 'Species Left', 'Target', 'New This Run'],
                                    ['self.formattedTime',
@@ -237,7 +226,75 @@ class FishMaxer:
         self.newCount = 0
         self.ownedSnapshot = self.ownedSet()
         self.autoerGui.startTimer()
+        self.startWatchdog()
+        self.startDockWatch()
         self.run()
+
+    def onDock(self):
+        try:
+            return self.spot is not None and self.spot.avId == base.localAvatar.doId
+        except:
+            return False
+
+    DOCK_WATCH_SECS = 10
+
+    def startDockWatch(self):
+        self.offDockTicks = 0
+        if not self.dockWatchOn:
+            self.dockWatchOn = True
+            Sequence(Wait(self.DOCK_WATCH_SECS), Func(self.dockWatch)).start()
+
+    def dockWatch(self):
+        if not self.shouldContinue:
+            self.dockWatchOn = False
+            return
+        if self.spot is not None and not self.onDock():
+            self.offDockTicks += 1
+            if self.offDockTicks > 1:
+                self.autoerGui.display.newLine('Off the dock - re-boarding')
+                self.offDockTicks = 0
+                self.spot = None
+                self.castTries = 0
+                self.boardAndFish()
+        else:
+            self.offDockTicks = 0
+        Sequence(Wait(self.DOCK_WATCH_SECS), Func(self.dockWatch)).start()
+
+    # A normal cycle hooks fish well inside this, so a flat fishNum means stuck.
+    WATCHDOG_SECS = 90
+
+    def startWatchdog(self):
+        self.lastFishNum = self.fishNum
+        if not self.watchdogOn:
+            self.watchdogOn = True
+            Sequence(Wait(self.WATCHDOG_SECS), Func(self.watchdog)).start()
+
+    def watchdog(self):
+        if not self.shouldContinue:
+            self.watchdogOn = False
+            return
+        if self.fishNum == self.lastFishNum:
+            self.autoerGui.display.newLine('Stuck - no fish hooked in %ss, restarting' % self.WATCHDOG_SECS)
+            base.localAvatar.setSystemMessage(0, 'Fish Maxer: looked stuck, restarting')
+            self.unstick()
+        self.lastFishNum = self.fishNum
+        Sequence(Wait(self.WATCHDOG_SECS), Func(self.watchdog)).start()
+
+    def unstick(self):
+        try:
+            if self.spot is not None:
+                self.spot.d_requestExit()
+        except:
+            pass
+        self.spot = None
+        self.castTries = 0
+        self.restoreCollisions()
+        self.walk()
+        # Re-teleport even if we're already there, to reload the street.
+        if self.targetPond is not None:
+            self.travelTo(self.targetPond)
+        else:
+            self.run()
 
     def run(self):
         if not self.shouldContinue:
@@ -257,15 +314,8 @@ class FishMaxer:
         zone = self.targetPond
         if self.atZone(zone):
             self.arriveAtPond()
-            return
-        if zone in self.STREET_BRANCHES:
-            hood = self.hoodFor(zone)
-            if self.atZone(hood):
-                self.enterTunnelTo(zone)
-            else:
-                self.travelTo(hood)          # get to the playground first
         else:
-            self.travelTo(zone)
+            self.travelTo(zone)              # streets included
 
     def hoodFor(self, zone):
         try:
@@ -279,29 +329,10 @@ class FishMaxer:
         except:
             return base.localAvatar.getZoneId() == zone
 
-    # At the target. Street ponds need the pond cell streamed in first.
     def arriveAtPond(self):
         if not self.shouldContinue:
             return
-        pv = self.STREET_POND_ZONE.get(self.targetPond)
-        if pv is not None:
-            self.removeStreetInterest()
-            self.autoerGui.display.newLine('Loading the dock...')
-            try:
-                self.streetInterest = base.cr.addInterest(base.localAvatar.defaultShard, pv, description='fishmaxer', event=None)
-            except:
-                self.streetInterest = None
-            Sequence(Wait(4), Func(self.boardAndFish)).start()
-        else:
-            self.boardAndFish()
-
-    def removeStreetInterest(self):
-        if getattr(self, 'streetInterest', None) is not None:
-            try:
-                base.cr.removeInterest(self.streetInterest)
-            except:
-                pass
-            self.streetInterest = None
+        self.boardAndFish()
 
     def restoreCollisions(self):
         try:
@@ -311,51 +342,18 @@ class FishMaxer:
 
     def travelTo(self, zone):
         self.restoreCollisions()
-        self.removeStreetInterest()
         self.autoerGui.display.newLine('Teleporting to ' + self.POND_NAMES.get(zone, '?'))
         self.walk()
+        # Streets go to the pond's visgroup cell. Playgrounds teleport plainly.
+        dest = self.STREET_POND_ZONE.get(zone, zone)
+        avId = None
+        if dest != zone:
+            avId = base.localAvatar.doId
         try:
-            base.cr.playGame.getPlace().requestTeleport(self.hoodFor(zone), zone, None, None)
+            base.cr.playGame.getPlace().requestTeleport(self.hoodFor(zone), dest, None, avId)
         except:
             pass
         Sequence(Wait(2), Func(self.afterArrive, zone, 0)).start()
-
-    # Fire the tunnel-enter event - same as walking into the tunnel.
-    def enterTunnelTo(self, street):
-        self.restoreCollisions()
-        self.autoerGui.display.newLine('Entering tunnel to ' + self.POND_NAMES.get(street, '?'))
-        self.walk()
-        name = self.findTunnelTrigger(street)
-        if name is None:
-            self.autoerGui.display.newLine('Tunnel not found yet, retrying')
-            Sequence(Wait(1), Func(self.proceed)).start()
-            return
-        try:
-            messenger.send('enter' + name, [None])
-        except:
-            pass
-        Sequence(Wait(2), Func(self.afterArrive, street, 0)).start()
-
-    def findTunnelTrigger(self, street):
-        branch = ZoneUtil.getBranchZone(street)
-        try:
-            matches = render.findAllMatches('**/tunnel_trigger_*')
-        except:
-            return None
-        for i in range(matches.getNumPaths()):
-            nm = matches.getPath(i).getName()
-            parts = nm.split('_')
-            try:
-                z = int(parts[-1])
-            except:
-                continue
-            try:
-                same = (ZoneUtil.getBranchZone(z) == branch)
-            except:
-                same = (z == street)
-            if same:
-                return nm
-        return None
 
     def afterArrive(self, zone, tries):
         if not self.shouldContinue:
@@ -374,15 +372,32 @@ class FishMaxer:
         except:
             pass
 
+    # doFindAll returns spots from every loaded zone. Boarding one from another
+    # zone seats us and then kicks us straight back off.
+    def atTargetPond(self, spot):
+        try:
+            return spot.area == self.targetPond
+        except:
+            return True
+
     def findFreeSpot(self):
-        spots = base.cr.doFindAll('FishingSpot')
-        for sp in spots:
+        free = None
+        sawPondSpot = False
+        for sp in base.cr.doFindAll('FishingSpot'):
+            atPond = self.atTargetPond(sp)
+            if atPond:
+                sawPondSpot = True
             av = getattr(sp, 'avId', 0)
             if av in (0, None) or av == base.localAvatar.doId:
-                return sp
-        if spots:
-            return spots[0]
-        return None
+                if atPond:
+                    return sp
+                if free is None:
+                    free = sp
+        # Only ignore the filter when it matched nothing - a pond whose spots are
+        # simply all taken should wait, not board a dock in another zone.
+        if sawPondSpot:
+            return None
+        return free
 
     def boardAndFish(self):
         if not self.shouldContinue:
@@ -412,7 +427,7 @@ class FishMaxer:
         if not self.shouldContinue:
             return
         sp = self.spot
-        if sp is None or getattr(sp, 'localToonFishing', 0) != 1:
+        if not self.onDock() or getattr(sp, 'localToonFishing', 0) != 1:
             # not seated yet - wait for the dock to seat us
             self.castTries = getattr(self, 'castTries', 0) + 1
             if self.castTries < 40:
@@ -422,18 +437,47 @@ class FishMaxer:
                 self.boardAndFish()   # give up waiting, re-board
             return
         self.castTries = 0
+        if not self.topUpBeans():
+            return
         try:
             sp.d_doCast(0.9, 0.0)
         except:
             pass
         Sequence(Wait(1.5), Func(self.catchFish)).start()
 
+    # A cast costs beans. With an empty wallet it just cancels, so pull from the
+    # bank first. Negative transferMoney is a withdrawal.
+    def topUpBeans(self):
+        try:
+            money = base.localAvatar.getMoney()
+            cost = FishGlobals.getCastCost(self.rodFor())
+            room = base.localAvatar.getMaxMoney() - money
+            bank = base.localAvatar.getBankMoney()
+        except:
+            return True
+        if money >= cost:
+            self.beanTries = 0
+            return True
+        self.beanTries += 1
+        if bank > 0 and room > 0 and self.beanTries < 10:
+            try:
+                base.cr.bankManager.d_transferMoney(-min(bank, room))
+            except:
+                pass
+            self.autoerGui.display.newLine('Withdrawing beans from the bank')
+            Sequence(Wait(1), Func(self.cast)).start()
+            return False
+        self.autoerGui.display.newLine('Out of jellybeans - cannot cast')
+        base.localAvatar.setSystemMessage(0, 'Fish Maxer: out of jellybeans, stopping')
+        self.setStop()
+        return False
+
     def catch(self):
         base.localAvatar.wakeUp()
         if not self.shouldContinue:
             return
         # only fish while genuinely seated
-        if getattr(self.spot, 'localToonFishing', 0) != 1:
+        if not self.onDock() or getattr(self.spot, 'localToonFishing', 0) != 1:
             return
         targets = base.cr.doFindAll('FishingTarget')
         if not targets:
@@ -586,7 +630,6 @@ class FishMaxer:
         self.autoerGui.stopTimer()
         self.autoerGui.display.newLine('Stopped')
         self.shouldContinue = False
-        self.removeStreetInterest()
         self.restoreCollisions()
 
     def revertFunctions(self):
