@@ -12,18 +12,14 @@ from toontown.hood import ZoneUtil
 
 class GardenMaxer:
 
-    DAY_SECONDS = 24 * 60 * 60
-
     def __init__(self):
         self.shouldContinue = False
-        self.dailyLoop = False
         self.plantNew = True
         self.sellAll = True
         self.harvested = 0
         self.watered = 0
         self.planted = 0
         self.sold = 0
-        self.loopTask = None
         self.installSafety()
         self.autoerGui = AutoerGui('Garden Maxer',
                                    ['Run Time', 'Varieties Owned', 'Varieties Left', 'Harvested', 'Planted'],
@@ -34,7 +30,7 @@ class GardenMaxer:
                                     'str(gardenMaxer.planted)'],
                                    'GARDEN MAXER', None)
 
-    # Stub out setMovie - the real one crashes the client when we fire updates directly.
+    # setMovie stub - the real one crashes the client on direct updates.
     SAFE_CLASSES = (DistributedLawnDecor.DistributedLawnDecor,
                     DistributedPlantBase.DistributedPlantBase,
                     DistributedGardenPlot.DistributedGardenPlot,
@@ -133,7 +129,6 @@ class GardenMaxer:
         except:
             return 1
 
-    # Uncollected varieties we can afford, cheapest first.
     def missingCandidates(self):
         maxB = self.maxBeans()
         out = []
@@ -145,24 +140,17 @@ class GardenMaxer:
                 continue
             out.append((c, s, v))
         out.sort()
+        out.reverse()
         return out
 
-    # Owned recipes to replant for shovel skill, cap-cost first.
+    # Replanting owned recipes is what grinds shovel skill.
     def grindCandidates(self):
         maxB = self.maxBeans()
-        best = []
-        rest = []
+        out = []
         for (s, v) in self.allVarieties():
-            c = self.costFor(s, v)
-            if c <= 0 or c > maxB:
-                continue
-            if c == maxB:
-                best.append((c, s, v))
-            else:
-                rest.append((c, s, v))
-        rest.sort()
-        rest.reverse()
-        return best + rest
+            if self.costFor(s, v) == maxB:
+                out.append((maxB, s, v))
+        return out
 
     def getMoney(self):
         try:
@@ -171,7 +159,7 @@ class GardenMaxer:
             return 0
 
     def inEstate(self):
-        # Estate zones are dynamic, so check the Place, not the zone id.
+        # Estate zones are dynamic, so Place first; zone id only as fallback.
         try:
             if 'Estate' in base.cr.playGame.getPlace().__class__.__name__:
                 return True
@@ -290,7 +278,7 @@ class GardenMaxer:
     def doPass(self):
         if not self.shouldContinue:
             return
-        self.autoerGui.display.newLine('--- Daily garden pass ---')
+        self.autoerGui.display.newLine('--- Garden pass ---')
         seq = Sequence()
         seq.append(Func(self.sellBasket))
         seq.append(Wait(1.5))
@@ -347,13 +335,11 @@ class GardenMaxer:
             self.watered += 1
         except:
             pass
-        # Some servers only commit water on the done update.
         try:
             flower.sendUpdate('waterPlantDone')
         except:
             pass
 
-    # Cash in the whole basket.
     def sellBasket(self):
         if not self.shouldContinue or not self.sellAll:
             return
@@ -395,7 +381,6 @@ class GardenMaxer:
         money = self.getMoney()
         idx = 0
         for plot in self.myFlowerPlots():
-            # Skip what we can't afford.
             while idx < len(candidates) and candidates[idx][0] > money:
                 idx += 1
             if idx < len(candidates):
@@ -436,42 +421,13 @@ class GardenMaxer:
                                        % (self.harvested, self.watered, self.sold, self.planted))
         base.localAvatar.setSystemMessage(0, 'Garden Maxer: pass done - %s harvested, %s watered, %s sold, %s planted.'
                                           % (self.harvested, self.watered, self.sold, self.planted))
-        if self.dailyLoop:
-            self.autoerGui.display.newLine('Daily loop ON - next pass in ~24h')
-            self.loopTask = Sequence(Wait(self.DAY_SECONDS), Func(self.repeat))
-            self.loopTask.start()
-        else:
-            self.setStop()
-
-    def repeat(self):
-        if not self.shouldContinue:
-            return
-        self.harvested = 0
-        self.planted = 0
-        self.watered = 0
-        self.sold = 0
-        if self.inEstate():
-            self.doPass()
-        else:
-            self.autoerGui.display.newLine('Not in estate at loop time - skipping, retry in 1h')
-            self.loopTask = Sequence(Wait(3600), Func(self.repeat))
-            self.loopTask.start()
+        self.setStop()
 
     def walk(self):
         try:
             base.cr.playGame.getPlace().fsm.forceTransition('walk')
         except:
             pass
-
-    def loopOn(self):
-        self.dailyLoop = True
-        base.localAvatar.setSystemMessage(0, 'Garden Maxer: Daily loop ON (re-runs every 24h while open)')
-        self.autoerGui.display.newLine('Daily loop ON')
-
-    def loopOff(self):
-        self.dailyLoop = False
-        base.localAvatar.setSystemMessage(0, 'Garden Maxer: Daily loop OFF (single pass)')
-        self.autoerGui.display.newLine('Daily loop OFF')
 
     def plantOn(self):
         self.plantNew = True
@@ -493,12 +449,6 @@ class GardenMaxer:
 
     def setStop(self):
         self.shouldContinue = False
-        if self.loopTask is not None:
-            try:
-                self.loopTask.pause()
-            except:
-                pass
-            self.loopTask = None
         self.autoerGui.stopTimer()
         self.autoerGui.display.newLine('Stopped')
 
